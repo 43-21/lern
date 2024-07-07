@@ -1,0 +1,114 @@
+use add::{Message as AddMessage, AddTab};
+use iced::{
+    alignment::{Horizontal, Vertical},
+    widget::{Column, Container},
+    Element, Length, Task,
+};
+use iced_aw::{TabLabel, Tabs};
+use lemmatize::{Message as LemmatizeMessage, LemmatizeTab};
+
+mod add;
+mod lemmatize;
+mod review;
+
+const HEADER_SIZE: u16 = 32;
+const TAB_PADDING: u16 = 16;
+
+pub fn run() -> iced::Result {
+    iced::application(App::title, App::update, App::view)
+        .run()
+}
+
+struct App {
+    active_tab: TabId,
+    add_tab: AddTab,
+    lemmatize_tab: LemmatizeTab,
+}
+
+#[derive(Clone, Debug)]
+enum Message {
+    TabSelected(TabId),
+    Add(AddMessage),
+    Lemmatize(LemmatizeMessage),
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+enum TabId {
+    Add,
+    Review,
+    Lemmatize,
+}
+
+impl App {
+    fn title(&self) -> String {
+        String::from("Lern")
+    }
+
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::TabSelected(selected) => {
+                self.active_tab = selected;
+                Task::none()
+            }
+            Message::Add(message) => {
+                let command = self.add_tab.update(message);
+                command.map(Message::Add)
+            }
+            Message::Lemmatize(message) => {
+                let command = self.lemmatize_tab.update(message);
+                command.map(Message::Lemmatize)
+            }
+        }
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        Tabs::new(Message::TabSelected)
+            .push(
+                TabId::Add,
+                self.add_tab.tab_label(),
+                self.add_tab.view()
+            )
+            .push(
+                TabId::Lemmatize,
+                self.lemmatize_tab.tab_label(),
+                self.lemmatize_tab.view(),
+            )
+            .set_active_tab(&self.active_tab)
+            .into()
+    }
+}
+
+trait Tab {
+    type Message;
+
+    fn title(&self) -> String;
+
+    fn tab_label(&self) -> TabLabel;
+
+    fn view(&self) -> Element<'_, Self::Message> {
+        let column = Column::new()
+            .spacing(20)
+            .push(self.content())
+            .align_items(iced::Alignment::Center);
+
+        Container::new(column)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(Horizontal::Center)
+            .align_y(Vertical::Center)
+            .padding(TAB_PADDING)
+            .into()
+    }
+
+    fn content(&self) -> Element<'_, Self::Message>;
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            active_tab: TabId::Add,
+            add_tab: AddTab::new(),
+            lemmatize_tab: LemmatizeTab::new(),
+        }
+    }
+}
