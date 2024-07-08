@@ -21,7 +21,7 @@ pub async fn create_tables(conn: &mut Connection) -> Result<()> {
                 "CREATE TABLE IF NOT EXISTS lemmas (
                     lemma TEXT PRIMARY KEY,
                     frequency INTEGER NOT NULL,
-                    general_frequency INTEGER NOT NULL,
+                    general_frequency INTEGER,
                     blacklisted INTEGER NOT NULL CHECK (blacklisted IN (0, 1))
                 )",
                 ()
