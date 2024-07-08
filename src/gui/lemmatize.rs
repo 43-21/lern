@@ -37,8 +37,11 @@ impl LemmatizeTab {
                 self.content.perform(action);
                 Task::none()
             }
-            Message::Lemmatize => {
-                Task::perform(lemmatize(self.content.text()), |result| {
+            Message::Lemmatize => {      
+                let text = self.content.text();
+                self.content = text_editor::Content::new();
+                self.is_dirty = false;       
+                Task::perform(lemmatize(text), |result| {
                     Message::LemmatizeResults(result.unwrap())
                 })
             }
