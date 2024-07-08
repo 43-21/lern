@@ -6,11 +6,21 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iced = { git = "https://github.com/iced-rs/iced.git", features = ["tokio"]}
-iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", rev = "4dfb6a27004ecf309b73c440b8cde78355c49448", default-features = false, features = ["tabs"] }
 regex = "1.10.5"
 rusqlite = { version = "0.31.0", features = ["bundled"] }
 serde = "1.0.203"
 serde_json = "1.0.117"
 tokio = { version = "1.38.0", features = ["full"] }
 tokio-rusqlite = "0.5.1"
+
+[dependencies.iced]
+git = "https://github.com/iced-rs/iced.git"
+rev = "b9eb86199afe0f2d936eb4ab90af5b2a2c32a87a"
+features = ["tokio"]
+
+[dependencies.iced_aw]
+path = "./iced_aw/"
+#git = "https://github.com/iced-rs/iced_aw.git"
+#rev = "a6faf720c3b361218af3974f3589215dc8fe0ae2"
+default-features = false
+features = ["tabs"]
