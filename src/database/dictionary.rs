@@ -172,7 +172,7 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
             }
         };
 
-        if !vec!["noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep"].contains(&pos) {
+        if !vec!["noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron"].contains(&pos) {
             continue 'iteration;
         }
 
