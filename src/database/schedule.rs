@@ -119,7 +119,7 @@ pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
     let queue = conn.call(move |conn| {
-        let mut stmt = conn.prepare("SELECT lemma FROM lemmas WHERE blacklisted = 0 ORDER BY id LIMIT ?1,200")?;
+        let mut stmt = conn.prepare("SELECT lemma FROM lemmas WHERE blacklisted = 0 ORDER BY general_frequency DESC LIMIT ?1,200")?;
 
         let rows = stmt.query_map([start], |row| {
             row.get::<usize, String>(0)
