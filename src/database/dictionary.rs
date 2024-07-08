@@ -117,6 +117,49 @@ pub async fn create_tables() -> Result<()> {
             "CREATE INDEX word_index ON words(word)",
             (),
         )?;
+
+        //pronunciation(word_id)
+        //pronunciation(id)
+
+        conn.execute(
+            "CREATE INDEX word_form_index ON word_forms(word_id)",
+            (),
+        )?;
+
+        conn.execute(
+            "CREATE INDEX form_tag_index ON form_tags(form_id)",
+            (),
+        )?;
+
+        conn.execute(
+            "CREATE INDEX sense_index ON senses(word_id)",
+            (),
+        )?;
+
+        conn.execute(
+            "CREATE INDEX example_index ON examples(sense_id)",
+            (),
+        )?;
+
+        conn.execute(
+            "CREATE INDEX sense_synonym_index ON sense_synonyms(sense_id)",
+            (),
+        )?;
+
+        conn.execute(
+            "CREATE INDEX sense_id_index ON senses(id)",
+            (),
+        )?;
+
+        conn.execute(
+            "CREATE INDEX pronunciation_index ON pronunciation(word_id)",
+            (),
+        )?;
+
+        conn.execute(
+            "CREATE INDEX pronunciation_id_index ON pronunciation(id)",
+            (),
+        )?;
         
         let start = std::time::Instant::now();
     

@@ -17,6 +17,11 @@ pub async fn create_table<P: AsRef<Path>>(path_to_frequencies: P) -> Result<()> 
                 )",
                 (),
             )?;
+
+            conn.execute(
+                "CREATE INDEX frequency_index ON frequency(word_id)",
+                (),
+            )?;
         
             Ok(())
         }
