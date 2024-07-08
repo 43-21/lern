@@ -159,9 +159,6 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
 
     'iteration:
     for line in lines.flatten() {
-        if serde_json::from_str::<serde_json::Value>(&line).is_err() {
-            println!("{line}");
-        }
         let json: serde_json::Value = serde_json::from_str(&line).unwrap();
 
         let word = json.get("word").unwrap().as_str().unwrap();
@@ -564,7 +561,7 @@ pub async fn get_lemmas(forms: Vec<String>) -> Result<Vec<String>> {
             "SELECT word FROM words
             JOIN word_forms ON words.id = word_id
             JOIN forms ON forms.id = form_id
-            WHERE translate(form, 'áéíóú', 'aeiou') = ?1"
+            WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(form, 'а́', 'а'), 'е́', 'е'), 'и́', 'и'), 'о́', 'о'), 'у́', 'у'), 'э́', 'э'), 'ы́', 'ы') = ?1"
         )?;
 
         for form in forms {
