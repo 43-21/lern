@@ -561,7 +561,8 @@ pub async fn get_lemmas(forms: Vec<String>) -> Result<Vec<String>> {
             "SELECT word FROM words
             JOIN word_forms ON words.id = word_id
             JOIN forms ON forms.id = form_id
-            WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(form, 'а́', 'а'), 'е́', 'е'), 'и́', 'и'), 'о́', 'о'), 'у́', 'у'), 'э́', 'э'), 'ы́', 'ы') = ?1"
+            WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(form, 'а́', 'а'), 'е́', 'е'), 'и́', 'и'), 'о́', 'о'), 'у́', 'у'), 'э́', 'э'), 'ы́', 'ы') = ?1
+            GROUP BY word_id"
         )?;
 
         for form in forms {
