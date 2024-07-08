@@ -58,8 +58,8 @@ pub async fn get_due_cards(conn: &mut Connection, time: u64) -> Result<Vec<Card>
             }
         
             drop(stmt);
-        
             ta.commit()?;
+
             Ok(cards)        
         }
     ).await?;
@@ -160,16 +160,19 @@ pub async fn blacklist_lemma(lemma: String) -> Result<()> {
 pub async fn insert_lemmas(lemmas: Vec<String>) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
     conn.call(|conn| {
-        let ta = conn.transaction()?;
+        let ta: rusqlite::Transaction = conn.transaction()?;
         let mut stmt = ta.prepare(
-            "INSERT INTO lemmas (lemma, frequency, general_frequency)
-            VALUES (?1, 0, SELECT frequency FROM frequency JOIN words ON id = word_id WHERE word = ?1)
+            "INSERT INTO lemmas
+            VALUES (?1, 1, (SELECT frequency FROM frequency JOIN words ON words.id = frequency.word_id WHERE word = ?1), 0)
             ON CONFLICT(lemma) DO UPDATE SET frequency = frequency + 1"
         )?;
 
         for lemma in lemmas {
             stmt.execute([lemma])?;
         }
+
+        drop(stmt);
+        ta.commit()?;
 
         Ok(())
     }).await
