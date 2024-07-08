@@ -90,6 +90,7 @@ impl Tab for LemmatizeTab {
                 )
                 .push(
                     Button::new(Text::new("Lemmatize"))
+                    .on_press(Message::Lemmatize)
                 )
         )
         .align_x(Horizontal::Center)
