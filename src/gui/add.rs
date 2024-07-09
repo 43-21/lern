@@ -104,19 +104,20 @@ impl AddTab {
             }
             Message::ReadFromQueue => {
                 if self.from_queue {
-                    let mut tasks = vec![Task::perform(
-                        schedule::get_lemmas_queue(self.ignored_from_queue),
-                        |lemmas| match lemmas {
-                            Ok(lemmas) => Message::QueueRead { lemmas },
-                            Err(e) => Message::Error(e.to_string()),
+                    let next_word_is_none = self.next_word.is_none();
+                    Task::future(schedule::get_lemmas_queue(self.ignored_from_queue))
+                        .then(move |lemmas| match lemmas {
+                            Ok(lemmas) => {
+                                let mut tasks = vec![Task::done(Message::QueueRead { lemmas })];
+                                if next_word_is_none {
+                                    tasks.push(Task::done(Message::Preload));
+                                }
+
+                                Task::batch(tasks)
+                            },
+                            Err(e) => Task::done(Message::Error(e.to_string())),
                         },
-                    )];
-
-                    if self.next_word.is_none() {
-                        tasks.push(Task::done(Message::Preload));
-                    }
-
-                    Task::batch(tasks)
+                    )
                 } else {
                     Task::none()
                 }

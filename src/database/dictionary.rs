@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
+use regex::Regex;
 use tokio_rusqlite::{params, Connection, Result, Transaction};
 use serde_json::Value;
 
@@ -59,7 +61,8 @@ pub async fn create_tables() -> Result<()> {
         conn.execute(
             "CREATE TABLE forms (
                 id INTEGER PRIMARY KEY,
-                form TEXT NOT NULL
+                form TEXT NOT NULL,
+                normalized_form TEXT NOT NULL
             )",
             (),
         )?;
@@ -118,11 +121,13 @@ pub async fn create_tables() -> Result<()> {
             (),
         )?;
 
-        //pronunciation(word_id)
-        //pronunciation(id)
+        conn.execute(
+            "CREATE INDEX word_id_index ON word_forms(word_id)",
+            (),
+        )?;
 
         conn.execute(
-            "CREATE INDEX word_form_index ON word_forms(word_id)",
+            "CREATE INDEX form_id_index ON word_forms(word_id)",
             (),
         )?;
 
@@ -147,17 +152,12 @@ pub async fn create_tables() -> Result<()> {
         )?;
 
         conn.execute(
-            "CREATE INDEX sense_id_index ON senses(id)",
-            (),
-        )?;
-
-        conn.execute(
             "CREATE INDEX pronunciation_index ON pronunciation(word_id)",
             (),
         )?;
 
         conn.execute(
-            "CREATE INDEX pronunciation_id_index ON pronunciation(id)",
+            "CREATE INDEX normalized_form_index ON forms(normalized_form)",
             (),
         )?;
         
@@ -191,7 +191,7 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
     let mut synonym_stmt = ta.prepare("INSERT INTO synonyms (synonym) VALUES (?1)")?;
     let mut sense_synonym_stmt = ta.prepare("INSERT INTO sense_synonyms (sense_id, synonym_id) VALUES (?1, ?2)")?;
 
-    let mut form_stmt = ta.prepare("INSERT INTO forms (form) VALUES (?1)")?;
+    let mut form_stmt = ta.prepare("INSERT INTO forms (form, normalized_form) VALUES (?1, ?2)")?;
     let mut word_form_stmt = ta.prepare("INSERT INTO word_forms (word_id, form_id) VALUES (?1, ?2)")?;
     let mut form_tag_stmt = ta.prepare("INSERT INTO form_tags (form_id, tag) VALUES (?1, ?2)")?;
 
@@ -359,7 +359,25 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
                     }
                 }
 
-                form_stmt.execute([word])?;
+                let patterns = vec![
+                    (r"а́", "а"),
+                    (r"е́", "е"),
+                    (r"и́", "и"),
+                    (r"о́", "о"),
+                    (r"у́", "у"),
+                    (r"э́", "э"),
+                    (r"ы́", "ы"),
+                    (r"ю́", "ю"),
+                    (r"я́", "я"),
+                ];
+
+                let mut normalized = String::from(word);
+                for (pattern, replacement) in patterns {
+                    let re = Regex::new(pattern).unwrap();
+                    normalized = re.replace_all(&normalized, replacement).to_string();
+                }
+
+                form_stmt.execute([word, &normalized])?;
                 let form_id = ta.last_insert_rowid();
                 word_form_stmt.execute([word_id, form_id])?;
 
@@ -406,7 +424,6 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
             let mut form_stmt = ta.prepare(
                 "SELECT forms.id, form FROM forms
                 JOIN word_forms ON forms.id = form_id
-                JOIN words ON words.id = word_id
                 WHERE word_id = ?1"
             )?;
         
@@ -449,7 +466,7 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                 let id: i64 = row.get(0)?;
                 let word: String = row.get(1)?;
                 let pos: String = row.get(2)?;
-                let etymology: Option<String> = row.get(3)?; // geht das?
+                let etymology: Option<String> = row.get(3)?;
                 Ok((id, word, pos, etymology))
             })?;
         
@@ -594,30 +611,62 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
-pub async fn get_lemmas(forms: Vec<String>) -> Result<Vec<String>> {
+pub async fn get_lemmas(forms: HashMap<String, usize>) -> Result<HashMap<String, usize>> {
     let conn = Connection::open("./db/database.db").await?;
+    let mut batches = vec![HashMap::<String, usize>::new()];
+    let mut i = 0;
+    for (form, count) in forms {
+        if batches.get(i).unwrap().len() == 500 {
+            i += 1;
+            batches.push(HashMap::new());
+        }
+        batches.get_mut(i).unwrap().insert(form, count);
+    }
     conn.call(|conn| {
-        let mut vec = Vec::new();
+        let mut hash_map = HashMap::new();
 
         let ta = conn.transaction()?;
-        let mut stmt = ta.prepare(
-            "SELECT word FROM words
-            JOIN word_forms ON words.id = word_id
-            JOIN forms ON forms.id = form_id
-            WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(form, 'а́', 'а'), 'е́', 'е'), 'и́', 'и'), 'о́', 'о'), 'у́', 'у'), 'э́', 'э'), 'ы́', 'ы') = ?1
-            GROUP BY word_id"
-        )?;
 
-        for form in forms {
-            let lemmas = stmt.query_map([form], |row| {
-                Ok(row.get(0)?)
+        for forms in batches {
+            let union = forms.into_iter().map(|(form, count)| {
+                format!(
+                    "SELECT word, {} AS count FROM joined_tables WHERE normalized_form = '{}' GROUP BY word_id", count, form)
+            }).collect::<Vec<String>>().join(" UNION ALL ");
+    
+            let query = format!(
+                "WITH joined_tables AS (
+                    SELECT word, word_id, normalized_form
+                    FROM words
+                    JOIN word_forms ON words.id = word_id
+                    JOIN forms ON forms.id = form_id
+                )
+                {}",
+                union
+            );
+    
+            let mut stmt: rusqlite::Statement = ta.prepare(&query)?;
+    
+            let mut start = std::time::Instant::now();
+
+            let lemmas = stmt.query_map((), |row| {
+                println!("elapsed: {:?}", start.elapsed());
+                start = std::time::Instant::now();
+                
+                Ok((row.get(0)?, row.get(1)?))
             })?;
 
+
+
             for lemma in lemmas {
-                vec.push(lemma?);
+                let (lemma, count) = lemma?;
+                hash_map.insert(lemma, count);
             }
         }
 
-        Ok(vec)
+        println!("{}", hash_map.len());
+
+        ta.commit()?;
+
+        Ok(hash_map)
     }).await
 }

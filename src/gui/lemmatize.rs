@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{text_editor, Button, Container, Row, Text},
@@ -17,7 +19,7 @@ pub struct LemmatizeTab {
 #[derive(Debug, Clone)]
 pub enum Message {
     ActionPerformed(text_editor::Action),
-    Lemmatize, LemmatizeResults(Vec<String>),
+    Lemmatize, LemmatizeResults(HashMap<String, usize>),
     LemmasInserted, LemmasOrdered,
     Error(String),
 }
