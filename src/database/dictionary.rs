@@ -25,7 +25,8 @@ pub async fn create_tables() -> Result<()> {
                 id INTEGER PRIMARY KEY,
                 word TEXT NOT NULL,
                 pos TEXT NOT NULL,
-                etymology TEXT
+                etymology TEXT,
+                expansion TEXT
             )",
             (),
         )?;
@@ -175,6 +176,8 @@ pub async fn create_tables() -> Result<()> {
 }
 
 fn insert_data(ta: &mut Transaction) -> Result<()> {
+    let mut word_stmt_expansion = ta.prepare("INSERT INTO words (word, pos, expansion) VALUES (?1, ?2, ?3)")?;
+    let mut word_stmt_etymology_expansion = ta.prepare("INSERT INTO words (word, pos, etymology, expansion) VALUES (?1, ?2, ?3, ?4)")?;
     let mut word_stmt_etymology = ta.prepare("INSERT INTO words (word, pos, etymology) VALUES (?1, ?2, ?3)")?;
     let mut word_stmt = ta.prepare("INSERT INTO words (word, pos) VALUES (?1, ?2)")?;
 
@@ -215,6 +218,16 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
             continue 'iteration;
         }
 
+        let head_templates = json.get("head_templates");
+        let expansion = {
+            if let Some(head_templates) = head_templates {
+                head_templates.as_array().unwrap().get(0).unwrap().get("expansion").unwrap().as_str()
+            }
+            else {
+                None
+            }
+        };
+
         let json_senses = json.get("senses").unwrap().as_array().unwrap();
         let mut senses = Vec::new();
 
@@ -239,8 +252,14 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
             continue 'iteration;
         }
 
-        if let Some(etymology) = etymology {
+        if let (Some(etymology), Some(expansion)) = (etymology, expansion) {
+            word_stmt_etymology_expansion.execute([word, pos, etymology, expansion])?;
+        }
+        else if let Some(etymology) = etymology {
             word_stmt_etymology.execute([word, pos, etymology])?;
+        }
+        else if let Some(expansion) = expansion {
+            word_stmt_expansion.execute([word, pos, expansion])?;
         }
         else {
             word_stmt.execute([word, pos])?;
@@ -461,11 +480,12 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                 let word: String = row.get(1)?;
                 let pos: String = row.get(2)?;
                 let etymology: Option<String> = row.get(3)?;
-                Ok((id, word, pos, etymology))
+                let expansion: Option<String> = row.get(4)?;
+                Ok((id, word, pos, etymology, expansion))
             })?;
         
             for entry in entry_iter {
-                let (id, word, pos, etymology) = entry?;
+                let (id, word, pos, etymology, expansion) = entry?;
         
                 let mut forms = Vec::new();
                 let mut senses = Vec::new();
@@ -580,6 +600,7 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                     word,
                     pos,
                     etymology,
+                    expansion,
                     senses,
                     forms,
                     pronunciations,

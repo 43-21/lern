@@ -3,6 +3,7 @@ pub struct Entry {
     pub word: String,
     pub pos: String,
     pub etymology: Option<String>,
+    pub expansion: Option<String>,
     pub senses: Vec<Sense>,
     pub forms: Vec<Form>,
     pub pronunciations: Vec<Pronunciation>,

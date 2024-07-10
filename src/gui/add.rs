@@ -94,8 +94,20 @@ impl AddTab {
             }
             Message::EntriesRead { preloading, entries } => {
                 if preloading {
-                    //placeholder string, should take the first word of the expansion
-                    self.next_word = Some((String::from("Preloaded Word"), entries));
+                    let expansion = {
+                        if !entries.is_empty() {
+                            entries.get(0).unwrap().expansion.clone()
+                        }
+                        else {
+                            None
+                        }
+                    };
+                    let with_accent = if let Some(expansion) = expansion {
+                        expansion.split_whitespace().next().unwrap_or("").to_owned()
+                    } else {
+                        String::new()
+                    };
+                    self.next_word = Some((with_accent, entries));
                 } else {
                     self.entries = entries;
                 }
