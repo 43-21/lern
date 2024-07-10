@@ -7,7 +7,7 @@ use iced::{
 };
 use iced_aw::TabLabel;
 
-use crate::{database::schedule, dictionary::{lemmatize, lemmatize_2}};
+use crate::dictionary::lemmatize;
 
 use super::Tab;
 
@@ -19,8 +19,7 @@ pub struct LemmatizeTab {
 #[derive(Debug, Clone)]
 pub enum Message {
     ActionPerformed(text_editor::Action),
-    Lemmatize, LemmatizeResults(HashMap<String, usize>),
-    LemmasInserted, LemmasOrdered,
+    Lemmatize,
     Error(String),
 }
 
@@ -43,31 +42,13 @@ impl LemmatizeTab {
                 let text = self.content.text();
                 self.content = text_editor::Content::new();
                 self.is_dirty = false;       
-                // Task::perform(lemmatize(text), |result| {
-                //     Message::LemmatizeResults(result.unwrap())
-                // })
-                Task::perform(lemmatize_2(text), |result| {
+
+                Task::future(lemmatize(text)).then(|result| {
                     match result {
-                        Ok(()) => Message::LemmasInserted,
-                        Err(e) => Message::Error(e.to_string())
+                        Ok(()) => Task::none(),
+                        Err(e) => Task::done(Message::Error(e.to_string()))
                     }
                 })
-            }
-            Message::LemmatizeResults(lemmas) => {
-                Task::batch(vec![
-                    Task::perform(schedule::insert_lemmas(lemmas), |res| {
-                        match res {
-                            Ok(_) => Message::LemmasInserted,
-                            Err(e) => Message::Error(e.to_string()),
-                        }
-                    }),
-                ])
-            }
-            Message::LemmasInserted => {
-                Task::none()
-            }
-            Message::LemmasOrdered => {
-                Task::none()
             }
             Message::Error(e) => {
                 println!("{e}");
