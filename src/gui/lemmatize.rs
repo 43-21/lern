@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{text_editor, Button, Container, Row, Text},

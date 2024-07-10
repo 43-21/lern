@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use tokio_rusqlite::{params, Connection, Result};
 
 use crate::fsrs::card::Card;
