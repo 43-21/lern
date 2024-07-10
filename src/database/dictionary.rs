@@ -72,14 +72,6 @@ pub async fn create_tables() -> Result<()> {
             (),
         )?;
     
-        // conn.execute(
-        //     "CREATE TABLE word_forms (
-        //         word_id INTEGER NOT NULL REFERENCES words(id),
-        //         form_id INTEGER NOT NULL REFERENCES forms(id)
-        //     )",
-        //     (),
-        // )?;
-    
         conn.execute(
             "CREATE TABLE synonyms (
                 id INTEGER PRIMARY KEY,
@@ -130,16 +122,6 @@ pub async fn create_tables() -> Result<()> {
             "CREATE INDEX word_index ON words(word)",
             (),
         )?;
-
-        // conn.execute(
-        //     "CREATE INDEX word_id_index ON word_forms(word_id)",
-        //     (),
-        // )?;
-
-        // conn.execute(
-        //     "CREATE INDEX form_id_index ON word_forms(word_id)",
-        //     (),
-        // )?;
 
         conn.execute(
             "CREATE INDEX word_form_index ON forms(word_id)",
@@ -207,7 +189,6 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
     let mut sense_synonym_stmt = ta.prepare("INSERT INTO sense_synonyms (sense_id, synonym_id) VALUES (?1, ?2)")?;
 
     let mut form_stmt = ta.prepare("INSERT INTO forms (form, word_id, normalized_form) VALUES (?1, ?2, ?3)")?;
-    // let mut word_form_stmt = ta.prepare("INSERT INTO word_forms (word_id, form_id) VALUES (?1, ?2)")?;
     let mut form_tag_stmt = ta.prepare("INSERT INTO form_tags (form_id, tag) VALUES (?1, ?2)")?;
 
     let mut pronunciation_stmt = ta.prepare("INSERT INTO pronunciation (word_id, ipa) VALUES (?1, ?2)")?;
@@ -394,7 +375,6 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
 
                 form_stmt.execute(params![word, word_id, &normalized])?;
                 let form_id = ta.last_insert_rowid();
-                // word_form_stmt.execute([word_id, form_id])?;
 
                 for tag in tags {
                     let tag = tag.as_str().unwrap();
