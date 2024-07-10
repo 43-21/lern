@@ -7,7 +7,7 @@ use iced::{
 };
 use iced_aw::TabLabel;
 
-use crate::{database::schedule, dictionary::lemmatize};
+use crate::{database::schedule, dictionary::{lemmatize, lemmatize_2}};
 
 use super::Tab;
 
@@ -43,8 +43,14 @@ impl LemmatizeTab {
                 let text = self.content.text();
                 self.content = text_editor::Content::new();
                 self.is_dirty = false;       
-                Task::perform(lemmatize(text), |result| {
-                    Message::LemmatizeResults(result.unwrap())
+                // Task::perform(lemmatize(text), |result| {
+                //     Message::LemmatizeResults(result.unwrap())
+                // })
+                Task::perform(lemmatize_2(text), |result| {
+                    match result {
+                        Ok(()) => Message::LemmasInserted,
+                        Err(e) => Message::Error(e.to_string())
+                    }
                 })
             }
             Message::LemmatizeResults(lemmas) => {

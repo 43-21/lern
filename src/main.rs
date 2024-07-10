@@ -6,7 +6,6 @@ mod dictionary;
 mod gui;
 
 fn main() {
-    gui::run().unwrap();
     // tokio::runtime::Builder::new_multi_thread()
     // .enable_all()
     // .build()
@@ -16,5 +15,6 @@ fn main() {
     //         database::create_dictionary().await.unwrap();
     //         database::create_schedule().await.unwrap();
     //     }
-    // )
+    // );
+    gui::run().unwrap();
 }

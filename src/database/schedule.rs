@@ -165,7 +165,7 @@ pub async fn insert_lemmas(lemmas: HashMap<String, usize>) -> Result<()> {
         let ta: rusqlite::Transaction = conn.transaction()?;
         let mut stmt = ta.prepare(
             "INSERT INTO lemmas
-            VALUES (?1, 1, (SELECT frequency FROM frequency JOIN words ON words.id = frequency.word_id WHERE word = ?1), 0)
+            VALUES (?1, ?2, (SELECT frequency FROM frequency JOIN words ON words.id = frequency.word_id WHERE word = ?1), 0)
             ON CONFLICT(lemma) DO UPDATE SET frequency = frequency + ?2"
         )?;
 

@@ -33,18 +33,20 @@ pub async fn create_tables() -> Result<()> {
         conn.execute(
             "CREATE TABLE senses (
                 id INTEGER PRIMARY KEY,
-                word_id INTEGER NOT NULL REFERENCES words(id),
+                word_id INTEGER NOT NULL,
                 sense TEXT,
-                relevance INTEGER NOT NULL
+                relevance INTEGER NOT NULL,
+                FOREIGN KEY(word_id) REFERENCES words(id)
             )",
             (),
         )?;
 
         conn.execute(
             "CREATE TABLE examples (
-                sense_id INTEGER NOT NULL REFERENCES senses(id),
+                sense_id INTEGER NOT NULL,
                 text TEXT NOT NULL,
-                english TEXT
+                english TEXT,
+                FOREIGN KEY(sense_id) REFERENCES senses(id)
             )",
             (),
         )?;
@@ -52,8 +54,9 @@ pub async fn create_tables() -> Result<()> {
         conn.execute(
             "CREATE TABLE pronunciation (
                 id INTEGER PRIMARY KEY,
-                word_id INTEGER NOT NULL REFERENCES words(id),
-                ipa TEXT NOT NULL
+                word_id INTEGER NOT NULL,
+                ipa TEXT NOT NULL,
+                FOREIGN KEY(word_id) REFERENCES words(id)
             )",
             (),
         )?;
@@ -61,19 +64,21 @@ pub async fn create_tables() -> Result<()> {
         conn.execute(
             "CREATE TABLE forms (
                 id INTEGER PRIMARY KEY,
+                word_id INTEGER NOT NULL,
                 form TEXT NOT NULL,
-                normalized_form TEXT NOT NULL
+                normalized_form TEXT NOT NULL,
+                FOREIGN KEY(word_id) REFERENCES words(id)
             )",
             (),
         )?;
     
-        conn.execute(
-            "CREATE TABLE word_forms (
-                word_id INTEGER NOT NULL REFERENCES words(id),
-                form_id INTEGER NOT NULL REFERENCES forms(id)
-            )",
-            (),
-        )?;
+        // conn.execute(
+        //     "CREATE TABLE word_forms (
+        //         word_id INTEGER NOT NULL REFERENCES words(id),
+        //         form_id INTEGER NOT NULL REFERENCES forms(id)
+        //     )",
+        //     (),
+        // )?;
     
         conn.execute(
             "CREATE TABLE synonyms (
@@ -85,32 +90,37 @@ pub async fn create_tables() -> Result<()> {
     
         conn.execute(
             "CREATE TABLE sense_synonyms (
-                sense_id INTEGER NOT NULL REFERENCES senses(id),
-                synonym_id INTEGER NOT NULL REFERENCES synonyms(id)
+                sense_id INTEGER NOT NULL,
+                synonym_id INTEGER NOT NULL,
+                FOREIGN KEY(sense_id) REFERENCES senses(id),
+                FOREIGN KEY(synonym_id) REFERENCES synonyms(id)
             )",
             (),
         )?;
     
         conn.execute(
             "CREATE TABLE form_tags (
-                form_id INTEGER NOT NULL REFERENCES forms(id),
-                tag TEXT NOT NULL
+                form_id INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                FOREIGN KEY(form_id) REFERENCES forms(id)
             )",
             (),
         )?;
     
         conn.execute(
             "CREATE TABLE pronunciation_tags (
-                pronunciation_id INTEGER NOT NULL REFERENCES pronunciation(id),
-                tag TEXT NOT NULL
+                pronunciation_id INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                FOREIGN KEY(pronunciation_id) REFERENCES pronunciation(id)
             )",
             (),
         )?;
     
         conn.execute(
             "CREATE TABLE sense_tags (
-                sense_id INTEGER NOT NULL REFERENCES senses(id),
-                tag TEXT NOT NULL
+                sense_id INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                FOREIGN KEY(sense_id) REFERENCES senses(id)
             )",
             (),
         )?;
@@ -121,13 +131,18 @@ pub async fn create_tables() -> Result<()> {
             (),
         )?;
 
-        conn.execute(
-            "CREATE INDEX word_id_index ON word_forms(word_id)",
-            (),
-        )?;
+        // conn.execute(
+        //     "CREATE INDEX word_id_index ON word_forms(word_id)",
+        //     (),
+        // )?;
+
+        // conn.execute(
+        //     "CREATE INDEX form_id_index ON word_forms(word_id)",
+        //     (),
+        // )?;
 
         conn.execute(
-            "CREATE INDEX form_id_index ON word_forms(word_id)",
+            "CREATE INDEX word_form_index ON forms(word_id)",
             (),
         )?;
 
@@ -191,8 +206,8 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
     let mut synonym_stmt = ta.prepare("INSERT INTO synonyms (synonym) VALUES (?1)")?;
     let mut sense_synonym_stmt = ta.prepare("INSERT INTO sense_synonyms (sense_id, synonym_id) VALUES (?1, ?2)")?;
 
-    let mut form_stmt = ta.prepare("INSERT INTO forms (form, normalized_form) VALUES (?1, ?2)")?;
-    let mut word_form_stmt = ta.prepare("INSERT INTO word_forms (word_id, form_id) VALUES (?1, ?2)")?;
+    let mut form_stmt = ta.prepare("INSERT INTO forms (form, word_id, normalized_form) VALUES (?1, ?2, ?3)")?;
+    // let mut word_form_stmt = ta.prepare("INSERT INTO word_forms (word_id, form_id) VALUES (?1, ?2)")?;
     let mut form_tag_stmt = ta.prepare("INSERT INTO form_tags (form_id, tag) VALUES (?1, ?2)")?;
 
     let mut pronunciation_stmt = ta.prepare("INSERT INTO pronunciation (word_id, ipa) VALUES (?1, ?2)")?;
@@ -377,9 +392,9 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
                     normalized = re.replace_all(&normalized, replacement).to_string();
                 }
 
-                form_stmt.execute([word, &normalized])?;
+                form_stmt.execute(params![word, word_id, &normalized])?;
                 let form_id = ta.last_insert_rowid();
-                word_form_stmt.execute([word_id, form_id])?;
+                // word_form_stmt.execute([word_id, form_id])?;
 
                 for tag in tags {
                     let tag = tag.as_str().unwrap();
@@ -423,7 +438,6 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
         
             let mut form_stmt = ta.prepare(
                 "SELECT forms.id, form FROM forms
-                JOIN word_forms ON forms.id = form_id
                 WHERE word_id = ?1"
             )?;
         
@@ -609,6 +623,37 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
     ).await?;
 
     Ok(entries)
+}
+
+pub async fn lemmatize(forms: HashMap<String, usize>) -> Result<()> {
+    let conn = Connection::open("./db/database.db").await?;
+    conn.call(|conn| {
+        let ta = conn.transaction()?;
+
+        let mut stmt = ta.prepare(
+            "INSERT INTO lemmas
+            SELECT w.word, ?1 as frequency, frequency.frequency AS general_frequency, 0 AS blacklisted
+                FROM words w
+                JOIN forms ON forms.word_id = w.id
+                JOIN frequency ON w.id = frequency.word_id
+                WHERE normalized_form = ?2
+                GROUP BY w.id
+            ON CONFLICT(lemma) DO UPDATE SET frequency = frequency + ?1"
+        )?;
+
+        let start = std::time::Instant::now();
+        for (form, frequency) in forms {
+            stmt.execute(params![frequency, form])?;
+        }
+
+        drop(stmt);
+
+        ta.commit()?;
+
+        println!("elapsed: {:?}", start.elapsed());
+
+        Ok(())
+    }).await
 }
 
 pub async fn get_lemmas(forms: HashMap<String, usize>) -> Result<HashMap<String, usize>> {

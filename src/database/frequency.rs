@@ -12,8 +12,9 @@ pub async fn create_table<P: AsRef<Path>>(path_to_frequencies: P) -> Result<()> 
         |conn| {
             conn.execute(
                 "CREATE TABLE frequency (
-                    word_id INTEGER NOT NULL REFERENCES words(id),
-                    frequency INTEGER
+                    word_id INTEGER NOT NULL,
+                    frequency INTEGER,
+                    FOREIGN KEY(word_id) REFERENCES words(id)
                 )",
                 (),
             )?;

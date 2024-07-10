@@ -11,8 +11,9 @@ pub async fn create_schedule() -> Result<()> {
         |conn| {
             conn.execute_batch(
                 "PRAGMA journal_mode = WAL;
-                PRAGMA synchronous = normal;
-                PRAGMA journal_size_limit = 6144000;"
+                --PRAGMA synchronous = OFF;
+                PRAGMA journal_size_limit = 6144000;
+                PRAGMA foreign_keys = ON;"
             )?;
                 
             Ok(()) 
