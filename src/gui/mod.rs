@@ -1,4 +1,3 @@
-use add::{Message as AddMessage, AddTab};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{Column, Container},
@@ -6,10 +5,12 @@ use iced::{
 };
 use iced_aw::{TabLabel, Tabs};
 use lemmatize::{Message as LemmatizeMessage, LemmatizeTab};
+use add::{Message as AddMessage, AddTab};
+use main::{Message as MainMessage, MainTab};
 
 mod add;
 mod lemmatize;
-mod review;
+mod main;
 
 const HEADER_SIZE: u16 = 32;
 const TAB_PADDING: u16 = 16;
@@ -23,6 +24,7 @@ struct App {
     active_tab: TabId,
     add_tab: AddTab,
     lemmatize_tab: LemmatizeTab,
+    main_tab: MainTab,
 }
 
 #[derive(Clone, Debug)]
@@ -30,13 +32,14 @@ enum Message {
     TabSelected(TabId),
     Add(AddMessage),
     Lemmatize(LemmatizeMessage),
+    Main(MainMessage),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 enum TabId {
     Add,
-    Review,
     Lemmatize,
+    Main,
 }
 
 impl App {
@@ -58,15 +61,24 @@ impl App {
                 let command = self.lemmatize_tab.update(message);
                 command.map(Message::Lemmatize)
             }
+            Message::Main(message) => {
+                let command = self.main_tab.update(message);
+                command.map(Message::Main)
+            }
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
         Tabs::new(Message::TabSelected)
             .push(
+                TabId::Main,
+                self.main_tab.tab_label(),
+                self.main_tab.view(),
+            )
+            .push(
                 TabId::Add,
                 self.add_tab.tab_label(),
-                self.add_tab.view()
+                self.add_tab.view(),
             )
             .push(
                 TabId::Lemmatize,
@@ -109,6 +121,7 @@ impl Default for App {
             active_tab: TabId::Add,
             add_tab: AddTab::new(),
             lemmatize_tab: LemmatizeTab::new(),
+            main_tab: MainTab::new(),
         }
     }
 }

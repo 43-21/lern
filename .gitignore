@@ -4,3 +4,4 @@ stories.txt
 todo.txt
 Cargo.lock
 iced_aw/
+db/
