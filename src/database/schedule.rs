@@ -119,7 +119,28 @@ pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
     let queue = conn.call(move |conn| {
-        let mut stmt = conn.prepare("SELECT lemma FROM lemmas WHERE blacklisted = 0 ORDER BY general_frequency DESC LIMIT ?1,200")?;
+        let mut stmt = conn.prepare(
+            "SELECT lemma FROM (
+                SELECT lemma, frequency, general_frequency,
+                ROW_NUMBER() OVER (
+                    ORDER BY frequency DESC
+                ) AS row_num_by_frequency,
+                ROW_NUMBER() OVER (
+                    ORDER BY general_frequency
+                ) AS row_num_by_general_frequency
+                FROM lemmas
+                WHERE blacklisted = 0
+            ) temp_table
+            ORDER BY
+                CASE
+                    WHEN row_num_by_frequency < row_num_by_general_frequency THEN row_num_by_frequency
+                    ELSE row_num_by_general_frequency
+                END,
+                CASE
+                    WHEN row_num_by_frequency < row_num_by_general_frequency THEN row_num_by_general_frequency
+                    ELSE row_num_by_frequency
+                END
+            LIMIT ?1,200")?;
 
         let rows = stmt.query_map([start], |row| {
             row.get::<usize, String>(0)
