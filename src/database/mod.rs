@@ -1,12 +1,13 @@
+use std::path::PathBuf;
+
 use tokio_rusqlite::{Connection, Result};
 
 pub mod dictionary;
 pub mod frequency;
 pub mod schedule;
+pub mod queue;
 
-pub async fn create_schedule() -> Result<()> {
-    let mut conn = Connection::open("./db/database.db").await?;
-
+async fn init(conn: &Connection) -> Result<()> {
     conn.call(
         |conn| {
             conn.execute_batch(
@@ -18,30 +19,45 @@ pub async fn create_schedule() -> Result<()> {
                 
             Ok(()) 
         }
-    ).await?;
+    ).await
+}
 
-    schedule::create_tables(&mut conn).await?;
+pub async fn create_schedule() -> Result<()> {
+    let mut conn = Connection::open("./db/database.db").await?;
+
+    init(&conn).await?;
+
+    schedule::create_table(&mut conn).await?;
 
     Ok(())
 }
 
-pub async fn create_dictionary() -> Result<()> {
-    let conn = Connection::open("./db/database.db").await?;
-    
-    conn.call(
-        |conn| {
-            conn.execute_batch(
-                "PRAGMA journal_mode = WAL;
-                PRAGMA synchronous = normal;
-                PRAGMA journal_size_limit = 6144000;"
-            )?;
-                
-            Ok(())
-        }
-    ).await?;
+pub async fn create_queue() -> Result<()> {
+    let mut conn = Connection::open("./db/database.db").await?;
 
-    dictionary::create_tables().await?;
-    frequency::create_table("./frequency.txt").await?;
+    init(&conn).await?;
+
+    queue::create_table(&mut conn).await?;
+
+    Ok(())
+}
+
+pub async fn create_dictionary(wiktionary_path: PathBuf) -> Result<()> {
+    let conn = Connection::open("./db/database.db").await?;
+
+    init(&conn).await?;
+    
+    dictionary::create_tables(wiktionary_path).await?;
+    
+    Ok(())
+}
+
+pub async fn create_frequency(frequency_path: PathBuf) -> Result<()> {
+    let conn = Connection::open("./db/database.db").await?;
+
+    init(&conn).await?;
+    
+    frequency::create_table(frequency_path).await?;
     
     Ok(())
 }

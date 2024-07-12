@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use regex::Regex;
 use tokio_rusqlite::{params, Connection, Result, Transaction};
@@ -16,10 +16,35 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines())
 }
 
-pub async fn create_tables() -> Result<()> {
+pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
 
     conn.call(|conn| {
+        conn.execute_batch(
+            "DROP TABLE IF EXISTS form_tags;
+            DROP TABLE IF EXISTS pronunciation_tags;                
+            DROP TABLE IF EXISTS sense_tags;
+            DROP TABLE IF EXISTS sense_synonyms;
+            DROP TABLE IF EXISTS examples;
+            DROP TABLE IF EXISTS pronunciation;
+            DROP TABLE IF EXISTS senses;
+            DROP TABLE IF EXISTS synonyms;
+            DROP TABLE IF EXISTS forms;
+            DROP TABLE IF EXISTS frequency;
+            DROP TABLE IF EXISTS words;"
+        )?;
+
+        conn.execute_batch(
+            "DROP INDEX IF EXISTS word_index;
+            DROP INDEX IF EXISTS word_form_index;
+            DROP INDEX IF EXISTS form_tag_index;
+            DROP INDEX IF EXISTS sense_index;
+            DROP INDEX IF EXISTS example_index;
+            DROP INDEX IF EXISTS sense_synonym_index;
+            DROP INDEX IF EXISTS pronunciation_index;
+            DROP INDEX IF EXISTS normalized_form_index;"
+        )?;
+
         conn.execute(
             "CREATE TABLE words (
                 id INTEGER PRIMARY KEY,
@@ -117,52 +142,24 @@ pub async fn create_tables() -> Result<()> {
             )",
             (),
         )?;
-    
         
         conn.execute(
-            "CREATE INDEX word_index ON words(word)",
+            "CREATE INDEX word_index ON words(word);
+            CREATE INDEX word_form_index ON forms(word_id);
+            CREATE INDEX form_tag_index ON form_tags(form_id);
+            CREATE INDEX sense_index ON senses(word_id);
+            CREATE INDEX example_index ON examples(sense_id);
+            CREATE INDEX sense_synonym_index ON sense_synonyms(sense_id);
+            CREATE INDEX pronunciation_index ON pronunciation(word_id);
+            CREATE INDEX normalized_form_index ON forms(normalized_form);",
             (),
         )?;
 
-        conn.execute(
-            "CREATE INDEX word_form_index ON forms(word_id)",
-            (),
-        )?;
-
-        conn.execute(
-            "CREATE INDEX form_tag_index ON form_tags(form_id)",
-            (),
-        )?;
-
-        conn.execute(
-            "CREATE INDEX sense_index ON senses(word_id)",
-            (),
-        )?;
-
-        conn.execute(
-            "CREATE INDEX example_index ON examples(sense_id)",
-            (),
-        )?;
-
-        conn.execute(
-            "CREATE INDEX sense_synonym_index ON sense_synonyms(sense_id)",
-            (),
-        )?;
-
-        conn.execute(
-            "CREATE INDEX pronunciation_index ON pronunciation(word_id)",
-            (),
-        )?;
-
-        conn.execute(
-            "CREATE INDEX normalized_form_index ON forms(normalized_form)",
-            (),
-        )?;
         
         let start = std::time::Instant::now();
     
         let mut ta = conn.transaction()?;
-        insert_data(&mut ta)?;
+        insert_data(&mut ta, path_to_wiktionary)?;
         ta.commit()?;
     
         let duration = start.elapsed();
@@ -175,7 +172,7 @@ pub async fn create_tables() -> Result<()> {
     Ok(())
 }
 
-fn insert_data(ta: &mut Transaction) -> Result<()> {
+fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> {
     let mut word_stmt_expansion = ta.prepare("INSERT INTO words (word, pos, expansion) VALUES (?1, ?2, ?3)")?;
     let mut word_stmt_etymology_expansion = ta.prepare("INSERT INTO words (word, pos, etymology, expansion) VALUES (?1, ?2, ?3, ?4)")?;
     let mut word_stmt_etymology = ta.prepare("INSERT INTO words (word, pos, etymology) VALUES (?1, ?2, ?3)")?;
@@ -197,7 +194,7 @@ fn insert_data(ta: &mut Transaction) -> Result<()> {
     let mut pronunciation_stmt = ta.prepare("INSERT INTO pronunciation (word_id, ipa) VALUES (?1, ?2)")?;
     let mut pronunciation_tag_stmt = ta.prepare("INSERT INTO pronunciation_tags (pronunciation_id, tag) VALUES (?1, ?2)")?;
 
-    let lines = read_lines("./kaikki.json").unwrap();
+    let lines = read_lines(path_to_wiktionary).unwrap();
 
     'iteration:
     for line in lines.flatten() {

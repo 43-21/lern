@@ -3,29 +3,45 @@ use std::path::PathBuf;
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{Button, Column, Container, Row, Text},
-    Alignment, Element, Task
+    Alignment, Element, Task,
 };
 use iced_aw::TabLabel;
+use rfd::AsyncFileDialog;
+
+use crate::database;
 
 use super::Tab;
 
 pub struct MainTab {
-    file: Option<PathBuf>,
+    wiktionary_path: Option<PathBuf>,
+    frequency_path: Option<PathBuf>,
+    dictionary: bool,
+    schedule: bool,
+    frequency: bool,
+    queue: bool,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Error(String),
-    OpenFile,
-    CreateDatabase,
-    ResetSchedule, ResetQueue,
-    UpdateDictionary,
+    SetWiktionaryFile,
+    SetFrequencyFile,
+    WiktionaryFileSet { path: Option<PathBuf> },
+    FrequencyFileSet { path: Option<PathBuf> },
+    CreateSchedule, CreateQueue, CreateDictionary, CreateFrequency,
+    ScheduleCreated, QueueCreated, DictionaryCreated, FrequencyCreated,
+    Export,
 }
 
 impl MainTab {
     pub fn new() -> MainTab {
         MainTab {
-            file: None,
+            wiktionary_path: None,
+            frequency_path: None,
+            dictionary: false,
+            schedule: false,
+            frequency: false,
+            queue: false,
         }
     }
 
@@ -35,19 +51,87 @@ impl MainTab {
                 println!("{e}");
                 Task::none()
             }
-            Message::OpenFile => {
+            Message::SetWiktionaryFile => Task::perform(
+                async {
+                    AsyncFileDialog::new()
+                        .set_title("Select file of wiktionary dumps")
+                        .pick_file()
+                        .await
+                },
+                |file_handle| Message::WiktionaryFileSet {
+                    path: match file_handle {
+                        Some(file_handle) => Some(file_handle.into()),
+                        None => None,
+                    },
+                },
+            ),
+            Message::SetFrequencyFile => Task::perform(
+                async {
+                    AsyncFileDialog::new()
+                        .set_title("Select file for frequencies")
+                        .pick_file()
+                        .await
+                },
+                |file_handle| Message::FrequencyFileSet {
+                    path: match file_handle {
+                        Some(file_handle) => Some(file_handle.into()),
+                        None => None,
+                    },
+                },
+            ),
+            Message::WiktionaryFileSet { path } => {
+                if path.is_some() {
+                    self.wiktionary_path = path;
+                }
                 Task::none()
             }
-            Message::CreateDatabase => {
+            Message::FrequencyFileSet { path } => {
+                if path.is_some() {
+                    self.frequency_path = path;
+                }
                 Task::none()
             }
-            Message::ResetSchedule => {
+            Message::CreateSchedule => {
+                Task::perform(database::create_schedule(), |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::ScheduleCreated,
+                })
+            }
+            Message::CreateQueue => {
+                Task::perform(database::create_queue(), |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::QueueCreated,
+                })
+            }
+            Message::CreateDictionary => {
+                Task::perform(database::create_dictionary(self.wiktionary_path.clone().unwrap()), |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::DictionaryCreated,
+                })
+            }
+            Message::CreateFrequency => {
+                Task::perform(database::create_frequency(self.frequency_path.clone().unwrap()), |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::FrequencyCreated,
+                })
+            }
+            Message::ScheduleCreated => {
+                self.schedule = true;
                 Task::none()
             }
-            Message::ResetQueue => {
+            Message::DictionaryCreated => {
+                self.dictionary = true;
                 Task::none()
             }
-            Message::UpdateDictionary => {
+            Message::QueueCreated => {
+                self.queue = true;
+                Task::none()
+            }
+            Message::FrequencyCreated => {
+                self.frequency = true;
+                Task::none()
+            }
+            Message::Export => {
                 Task::none()
             }
         }
@@ -66,44 +150,93 @@ impl Tab for MainTab {
     }
 
     fn content(&self) -> iced::Element<'_, Self::Message> {
-        let database_row = Row::new()
-        .align_items(Alignment::Center)
-        .padding(20)
-        .spacing(16)
-        .push(
-            Button::new(Text::new("Set Dictionary JSON File"))
-            .on_press(Message::OpenFile)
-        )
-        .push(
-            Button::new(Text::new("Create Database"))
-            .on_press(Message::CreateDatabase)
-        );
+        let frequency_msg = {
+            if self.frequency_path.is_some() && self.dictionary {
+                Some(Message::CreateFrequency)
+            } else {
+                None
+            }
+        };
+        let dictionary_msg: Option<Message> = {
+            if self.wiktionary_path.is_some() {
+                Some(Message::CreateDictionary)
+            } else {
+                None
+            }
+        };
 
+        let dictionary = {
+            if self.dictionary {
+                Some("exists")
+            } else {
+                None
+            }
+        };
+
+        let frequency = {
+            if self.frequency {
+                Some("exists")
+            } else {
+                None
+            }
+        };
+
+        let schedule = {
+            if self.schedule {
+                Some("exists")
+            } else {
+                None
+            }
+        };
+
+        let queue = {
+            if self.queue {
+                Some("exists")
+            } else {
+                None
+            }
+        };
+
+        let file_row = Row::new()
+            .align_items(Alignment::Center)
+            .padding(20)
+            .spacing(16)
+            .push(
+                Button::new(Text::new("Load Dictionary File")).on_press(Message::SetWiktionaryFile),
+            )
+            .push(
+                Button::new(Text::new("Load Frequency File")).on_press(Message::SetFrequencyFile),
+            );
+
+        let create_row = Row::new()
+            .align_items(Alignment::Center)
+            .padding(20)
+            .spacing(16)
+            .push_maybe(dictionary)
+            .push(Button::new(Text::new("Create Dictionary")).on_press_maybe(dictionary_msg))
+            .push(Button::new(Text::new("Create Frequencies")).on_press_maybe(frequency_msg))
+            .push_maybe(frequency);
 
         let clear_row = Row::new()
-        .align_items(Alignment::Center)
-        .padding(20)
-        .spacing(16)
-        .push(
-            Button::new(Text::new("Clear Schedule"))
-            .on_press(Message::ResetSchedule)
-        )
-        .push(
-            Button::new(Text::new("Clear Queue"))
-            .on_press(Message::ResetQueue)
-        );
+            .align_items(Alignment::Center)
+            .padding(20)
+            .spacing(16)
+            .push_maybe(schedule)
+            .push(Button::new(Text::new("Create Schedule")).on_press(Message::CreateSchedule))
+            .push(Button::new(Text::new("Create Queue")).on_press(Message::CreateQueue))
+            .push_maybe(queue);
 
         let content: Element<'_, Message> = Container::new(
             Column::new()
                 .align_items(Alignment::Center)
                 .padding(20)
                 .spacing(16)
-                .push(database_row)
-                .push(
-                    Button::new(Text::new("Update Dictionary"))
-                    .on_press(Message::UpdateDictionary)
-                )
+                .push(file_row)
+                .push(create_row)
                 .push(clear_row)
+                .push(
+                    Button::new(Text::new("Export to Anki")).on_press(Message::Export)
+                ),
         )
         .align_x(Horizontal::Center)
         .align_y(Vertical::Center)

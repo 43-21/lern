@@ -10,6 +10,10 @@ pub async fn create_table<P: AsRef<Path>>(path_to_frequencies: P) -> Result<()> 
 
     conn.call(
         |conn| {
+            conn.execute_batch(
+                "DROP TABLE IF EXISTS frequency;
+                DROP INDEX IF EXISTS frequency_index;",
+            )?;
             conn.execute(
                 "CREATE TABLE frequency (
                     word_id INTEGER NOT NULL,

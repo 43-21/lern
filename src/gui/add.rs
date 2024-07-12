@@ -6,7 +6,7 @@ use iced::{
 use iced_aw::TabLabel;
 
 use crate::{
-    database::{dictionary, schedule},
+    database::{dictionary, queue, schedule},
     dictionary::entry::Entry,
     fsrs::card::Card,
 };
@@ -57,7 +57,6 @@ impl AddTab {
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        //return Task<Message>
         match message {
             Message::RussianChanged(value) => {
                 self.russian = value;
@@ -117,7 +116,7 @@ impl AddTab {
             Message::ReadFromQueue => {
                 if self.from_queue {
                     let next_word_is_none = self.next_word.is_none();
-                    Task::future(schedule::get_lemmas_queue(self.ignored_from_queue))
+                    Task::future(queue::get_lemmas_queue(self.ignored_from_queue))
                         .then(move |lemmas| match lemmas {
                             Ok(lemmas) => {
                                 let mut tasks = vec![Task::done(Message::QueueRead { lemmas })];
@@ -142,7 +141,7 @@ impl AddTab {
                 Task::none()
             }
             Message::Blacklist => {
-                Task::perform(schedule::blacklist_lemma(self.russian.clone()), |_| {
+                Task::perform(queue::blacklist_lemma(self.russian.clone()), |_| {
                     Message::LoadNext
                 })
             }
