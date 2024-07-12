@@ -61,7 +61,7 @@ impl MainTab {
             }
             Message::SetWiktionaryFile => Task::perform(
                 AsyncFileDialog::new()
-                    .set_title("Select file of wiktionary dumps")
+                    .set_title("Wiktionary")
                     .add_filter("JSON Lines", &["jsonl"])
                     .pick_file(),
                 |file_handle| Message::WiktionaryFileSet {
@@ -73,8 +73,8 @@ impl MainTab {
             ),
             Message::SetFrequencyFile => Task::perform(
                 AsyncFileDialog::new()
-                    .set_title("Select file for frequencies")
-                    .add_filter("txt", &["txt"])
+                    .set_title("Frequency")
+                    .add_filter("text", &["txt"])
                     .pick_file(),
                 |file_handle| Message::FrequencyFileSet {
                     path: match file_handle {
@@ -137,9 +137,11 @@ impl MainTab {
             }
             Message::SetExportLocation => Task::perform(
                 AsyncFileDialog::new()
-                    .set_title("Set export location")
-                    .add_filter("txt", &["txt"])
-                    .pick_file(),
+                    .set_title("Export")
+                    .add_filter("text", &["txt"])
+                    .set_directory("Downloads")
+                    .set_file_name("RussianDeck")
+                    .save_file(),
                 |file_handle| Message::Export {
                     path: match file_handle {
                         Some(file_handle) => Some(file_handle.into()),
