@@ -8,7 +8,7 @@ use iced::{
 use iced_aw::TabLabel;
 use rfd::AsyncFileDialog;
 
-use crate::database;
+use crate::database::{self, schedule};
 
 use super::Tab;
 
@@ -28,9 +28,17 @@ pub enum Message {
     SetFrequencyFile,
     WiktionaryFileSet { path: Option<PathBuf> },
     FrequencyFileSet { path: Option<PathBuf> },
-    CreateSchedule, CreateQueue, CreateDictionary, CreateFrequency,
-    ScheduleCreated, QueueCreated, DictionaryCreated, FrequencyCreated,
-    Export,
+    CreateSchedule,
+    CreateQueue,
+    CreateDictionary,
+    CreateFrequency,
+    ScheduleCreated,
+    QueueCreated,
+    DictionaryCreated,
+    FrequencyCreated,
+    SetExportLocation,
+    Export { path: Option<PathBuf> },
+    Exported,
 }
 
 impl MainTab {
@@ -52,12 +60,10 @@ impl MainTab {
                 Task::none()
             }
             Message::SetWiktionaryFile => Task::perform(
-                async {
-                    AsyncFileDialog::new()
-                        .set_title("Select file of wiktionary dumps")
-                        .pick_file()
-                        .await
-                },
+                AsyncFileDialog::new()
+                    .set_title("Select file of wiktionary dumps")
+                    .add_filter("JSON Lines", &["jsonl"])
+                    .pick_file(),
                 |file_handle| Message::WiktionaryFileSet {
                     path: match file_handle {
                         Some(file_handle) => Some(file_handle.into()),
@@ -66,12 +72,10 @@ impl MainTab {
                 },
             ),
             Message::SetFrequencyFile => Task::perform(
-                async {
-                    AsyncFileDialog::new()
-                        .set_title("Select file for frequencies")
-                        .pick_file()
-                        .await
-                },
+                AsyncFileDialog::new()
+                    .set_title("Select file for frequencies")
+                    .add_filter("txt", &["txt"])
+                    .pick_file(),
                 |file_handle| Message::FrequencyFileSet {
                     path: match file_handle {
                         Some(file_handle) => Some(file_handle.into()),
@@ -97,24 +101,24 @@ impl MainTab {
                     Ok(()) => Message::ScheduleCreated,
                 })
             }
-            Message::CreateQueue => {
-                Task::perform(database::create_queue(), |res| match res {
-                    Err(e) => Message::Error(e.to_string()),
-                    Ok(()) => Message::QueueCreated,
-                })
-            }
-            Message::CreateDictionary => {
-                Task::perform(database::create_dictionary(self.wiktionary_path.clone().unwrap()), |res| match res {
+            Message::CreateQueue => Task::perform(database::create_queue(), |res| match res {
+                Err(e) => Message::Error(e.to_string()),
+                Ok(()) => Message::QueueCreated,
+            }),
+            Message::CreateDictionary => Task::perform(
+                database::create_dictionary(self.wiktionary_path.clone().unwrap()),
+                |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::DictionaryCreated,
-                })
-            }
-            Message::CreateFrequency => {
-                Task::perform(database::create_frequency(self.frequency_path.clone().unwrap()), |res| match res {
+                },
+            ),
+            Message::CreateFrequency => Task::perform(
+                database::create_frequency(self.frequency_path.clone().unwrap()),
+                |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::FrequencyCreated,
-                })
-            }
+                },
+            ),
             Message::ScheduleCreated => {
                 self.schedule = true;
                 Task::none()
@@ -131,7 +135,27 @@ impl MainTab {
                 self.frequency = true;
                 Task::none()
             }
-            Message::Export => {
+            Message::SetExportLocation => Task::perform(
+                AsyncFileDialog::new()
+                    .set_title("Set export location")
+                    .add_filter("txt", &["txt"])
+                    .pick_file(),
+                |file_handle| Message::Export {
+                    path: match file_handle {
+                        Some(file_handle) => Some(file_handle.into()),
+                        None => None,
+                    },
+                },
+            ),
+            Message::Export { path } => match path {
+                Some(path) => Task::perform(schedule::export(path), |res| match res {
+                    Ok(()) => Message::Exported,
+                    Err(e) => Message::Error(e.to_string()),
+                }),
+                None => Task::none(),
+            },
+            Message::Exported => {
+                println!("exported!");
                 Task::none()
             }
         }
@@ -235,7 +259,7 @@ impl Tab for MainTab {
                 .push(create_row)
                 .push(clear_row)
                 .push(
-                    Button::new(Text::new("Export to Anki")).on_press(Message::Export)
+                    Button::new(Text::new("Export to Anki")).on_press(Message::SetExportLocation),
                 ),
         )
         .align_x(Horizontal::Center)

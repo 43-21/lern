@@ -109,3 +109,34 @@ pub async fn update_cards(conn: &mut Connection, cards: Vec<Card>) -> Result<()>
 
     Ok(())
 }
+
+pub async fn export(path: PathBuf) -> Result<()> {
+    let mut file = fs::File::create(path).await.expect("error when attempting to create file");
+
+    let conn = Connection::open("./db/database.db").await?;
+    let buffer = conn.call(move |conn| {
+        let mut buffer = String::new();
+
+        buffer += "#seperator:Semicolon\n";
+        buffer += "#html:false\n";
+    
+        let mut stmt = conn.prepare(
+            "SELECT russian, native FROM cards"
+        )?;
+
+        let rows = stmt.query_map((),|row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
+
+        for row in rows {
+            let (russian, native): (String, String) = row?;
+            buffer += format!("{russian};{native}\n").as_str();
+        }
+
+        Ok(buffer)
+    }).await?;
+
+    file.write_all(buffer.as_bytes()).await.expect("error when writing into file");
+
+    Ok(())
+}
