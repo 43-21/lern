@@ -3,7 +3,6 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 
-use regex::Regex;
 use tokio_rusqlite::{params, Connection, Result, Transaction};
 use serde_json::Value;
 

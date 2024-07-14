@@ -1,4 +1,3 @@
-use regex::Regex;
 use tokio_rusqlite::{Connection, Result};
 
 use crate::dictionary;
