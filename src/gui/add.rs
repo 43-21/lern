@@ -1,6 +1,8 @@
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{text::Shaping, Button, Checkbox, Column, Container, Row, Text, TextInput},
+    widget::{
+        text::Shaping, Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput,
+    },
     Alignment, Element, Length, Task,
 };
 use iced_aw::TabLabel;
@@ -17,15 +19,25 @@ use super::Tab;
 pub enum Message {
     RussianChanged(String),
     NativeChanged(String),
-    DictionaryTimer { version: usize },
-    ReadEntries { preloading: bool, word: String },
-    EntriesRead { preloading: bool, entries: Vec<Entry> },
+    DictionaryTimer {
+        version: usize,
+    },
+    ReadEntries {
+        preloading: bool,
+        word: String,
+    },
+    EntriesRead {
+        preloading: bool,
+        entries: Vec<Entry>,
+    },
     LoadNext,
     Preload,
     Add,
     FromQueue(bool),
     ReadFromQueue,
-    QueueRead { lemmas: Vec<String> },
+    QueueRead {
+        lemmas: Vec<String>,
+    },
     Blacklist,
     Ignore,
     Error(String),
@@ -86,18 +98,23 @@ impl AddTab {
             }
             Message::DictionaryTimer { version } => {
                 if version == self.version {
-                    Task::done(Message::ReadEntries { preloading: false, word: self.russian.clone() } )
+                    Task::done(Message::ReadEntries {
+                        preloading: false,
+                        word: self.russian.clone(),
+                    })
                 } else {
                     Task::none()
                 }
             }
-            Message::EntriesRead { preloading, entries } => {
+            Message::EntriesRead {
+                preloading,
+                entries,
+            } => {
                 if preloading {
                     let expansion = {
                         if !entries.is_empty() {
                             entries.get(0).unwrap().expansion.clone()
-                        }
-                        else {
+                        } else {
                             None
                         }
                     };
@@ -116,8 +133,8 @@ impl AddTab {
             Message::ReadFromQueue => {
                 if self.from_queue {
                     let next_word_is_none = self.next_word.is_none();
-                    Task::future(queue::get_lemmas_queue(self.ignored_from_queue))
-                        .then(move |lemmas| match lemmas {
+                    Task::future(queue::get_lemmas_queue(self.ignored_from_queue)).then(
+                        move |lemmas| match lemmas {
                             Ok(lemmas) => {
                                 let mut tasks = vec![Task::done(Message::QueueRead { lemmas })];
                                 if next_word_is_none {
@@ -125,7 +142,7 @@ impl AddTab {
                                 }
 
                                 Task::batch(tasks)
-                            },
+                            }
                             Err(e) => Task::done(Message::Error(e.to_string())),
                         },
                     )
@@ -153,14 +170,16 @@ impl AddTab {
                 println!("{message}");
                 Task::none()
             }
-            Message::ReadEntries { preloading, word } => {
-                Task::perform(dictionary::read_entries(word), move |entries| {
-                    match entries {
-                        Ok(entries) => Message::EntriesRead { preloading, entries },
-                        Err(e) => Message::Error(e.to_string()),
-                    }
-                })
-            }
+            Message::ReadEntries { preloading, word } => Task::perform(
+                dictionary::read_entries(word),
+                move |entries| match entries {
+                    Ok(entries) => Message::EntriesRead {
+                        preloading,
+                        entries,
+                    },
+                    Err(e) => Message::Error(e.to_string()),
+                },
+            ),
             Message::FromQueue(value) => {
                 self.from_queue = value;
                 Task::done(Message::LoadNext)
@@ -185,11 +204,11 @@ impl AddTab {
             Message::Preload => {
                 if self.lemmas.is_empty() {
                     Task::done(Message::ReadFromQueue)
-                }
-                else {
-                    Task::done(
-                        Message::ReadEntries { preloading: true, word: self.lemmas.remove(0) }
-                    )
+                } else {
+                    Task::done(Message::ReadEntries {
+                        preloading: true,
+                        word: self.lemmas.remove(0),
+                    })
                 }
             }
         }
@@ -233,7 +252,7 @@ impl Tab for AddTab {
             )
         };
 
-        let mut column = Column::new()
+        let column = Column::new()
             .align_items(Alignment::Center)
             .max_width(600)
             .padding(20)
@@ -254,20 +273,88 @@ impl Tab for AddTab {
             .push(button_row)
             .push(Checkbox::new("Add From Queue", self.from_queue).on_toggle(Message::FromQueue));
 
+        let mut entry_column = Column::new()
+            .align_items(Alignment::Start)
+            .padding(20)
+            .spacing(16);
+
         for entry in &self.entries {
             let etymology = match &entry.etymology {
-                Some(etymology) => Some(Text::new(etymology).shaping(Shaping::Advanced)),
+                Some(etymology) => Some(Text::new( etymology).shaping(Shaping::Advanced)),
                 _ => None,
             };
-            column = column
-                .push(Text::new(format!("{}, {}", entry.word, entry.pos)))
-                .push_maybe(etymology)
+
+            let word = {
+                if let Some(expansion) = &entry.expansion {
+                    expansion
+                } else {
+                    &entry.word
+                }
+            };
+
+            if !entry.pronunciations.is_empty() {
+                entry_column = entry_column.push(
+                    Text::new("Pronunciation")
+                );
+            }
+
+            for pronunciation in &entry.pronunciations {
+                let tag_string = {
+                    if pronunciation.tags.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" ({})", pronunciation.tags.join(", "))
+                    }
+                };
+                entry_column = entry_column.push(
+                    Text::new(format!("  {}{}", pronunciation.ipa, tag_string))
+                        .shaping(Shaping::Advanced),
+                )
+            }
+
+            entry_column = entry_column
+                .push(Text::new(format!("{}, {}", word, entry.pos)).shaping(Shaping::Advanced))
+                .push_maybe(etymology);
+
+            for (i, sense) in entry.senses.iter().enumerate() {
+                let tag_string = {
+                    if sense.tags.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" ({})", sense.tags.join(", "))
+                    }
+                };
+                entry_column = entry_column.push(Text::new(format!(
+                    "    {}. {}{}",
+                    i + 1,
+                    sense.sense,
+                    tag_string
+                )).shaping(Shaping::Advanced));
+
+                for example in &sense.examples {
+                    let translation = if let Some(example) = &example.english { format!(" - {}", example) } else { String::new() };
+                    entry_column = entry_column.push(
+                        Text::new(format!("        {}{}", example.text, translation)).shaping(Shaping::Advanced)
+                    );
+                }
+            }
         }
 
-        let content: Element<'_, Message> = Container::new(column)
-            .align_x(Horizontal::Center)
-            .align_y(Vertical::Center)
-            .into();
+        let entry_scrollable = if self.entries.is_empty() {
+            None
+        } else {
+            Some(Scrollable::new(entry_column).width(Length::Fill))
+        };
+
+        let content: Element<'_, Message> = Container::new(
+            Row::new()
+                .align_items(Alignment::Center)
+                .push(column.width(Length::Fill))
+                .push_maybe(entry_scrollable),
+        )
+        .align_x(Horizontal::Center)
+        .align_y(Vertical::Center)
+        .into();
 
         content.map(super::Message::Add)
     }
