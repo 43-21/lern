@@ -128,21 +128,17 @@ impl AddTab {
                     self.entries = entries;
                 }
 
-                Task::none()
+                if self.russian.is_empty() && preloading {
+                    Task::done(Message::LoadNext)
+                } else {
+                    Task::none()
+                }
             }
             Message::ReadFromQueue => {
                 if self.from_queue {
-                    let next_word_is_none = self.next_word.is_none();
                     Task::future(queue::get_lemmas_queue(self.ignored_from_queue)).then(
                         move |lemmas| match lemmas {
-                            Ok(lemmas) => {
-                                let mut tasks = vec![Task::done(Message::QueueRead { lemmas })];
-                                if next_word_is_none {
-                                    tasks.push(Task::done(Message::Preload));
-                                }
-
-                                Task::batch(tasks)
-                            }
+                            Ok(lemmas) => Task::done(Message::QueueRead { lemmas }),
                             Err(e) => Task::done(Message::Error(e.to_string())),
                         },
                     )
@@ -155,7 +151,11 @@ impl AddTab {
                 if self.lemmas.len() == 0 {
                     self.from_queue = false;
                 }
-                Task::none()
+                if self.next_word.is_none() {
+                    Task::done(Message::Preload)
+                } else {
+                    Task::none()
+                }
             }
             Message::Blacklist => {
                 Task::perform(queue::blacklist_lemma(self.russian.clone()), |_| {
@@ -271,7 +271,7 @@ impl Tab for AddTab {
                     .on_submit(Message::Add),
             )
             .push(button_row)
-            .push(Checkbox::new("Add From Queue", self.from_queue).on_toggle(Message::FromQueue));
+            .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue));
 
         let mut entry_column = Column::new()
             .align_items(Alignment::Start)
@@ -280,7 +280,7 @@ impl Tab for AddTab {
 
         for entry in &self.entries {
             let etymology = match &entry.etymology {
-                Some(etymology) => Some(Text::new( etymology).shaping(Shaping::Advanced)),
+                Some(etymology) => Some(Text::new(etymology).shaping(Shaping::Advanced)),
                 _ => None,
             };
 
@@ -293,9 +293,7 @@ impl Tab for AddTab {
             };
 
             if !entry.pronunciations.is_empty() {
-                entry_column = entry_column.push(
-                    Text::new("Pronunciation")
-                );
+                entry_column = entry_column.push(Text::new("Pronunciation"));
             }
 
             for pronunciation in &entry.pronunciations {
@@ -324,17 +322,20 @@ impl Tab for AddTab {
                         format!(" ({})", sense.tags.join(", "))
                     }
                 };
-                entry_column = entry_column.push(Text::new(format!(
-                    "    {}. {}{}",
-                    i + 1,
-                    sense.sense,
-                    tag_string
-                )).shaping(Shaping::Advanced));
+                entry_column = entry_column.push(
+                    Text::new(format!("    {}. {}{}", i + 1, sense.sense, tag_string))
+                        .shaping(Shaping::Advanced),
+                );
 
                 for example in &sense.examples {
-                    let translation = if let Some(example) = &example.english { format!(" - {}", example) } else { String::new() };
+                    let translation = if let Some(example) = &example.english {
+                        format!(" - {}", example)
+                    } else {
+                        String::new()
+                    };
                     entry_column = entry_column.push(
-                        Text::new(format!("        {}{}", example.text, translation)).shaping(Shaping::Advanced)
+                        Text::new(format!("        {}{}", example.text, translation))
+                            .shaping(Shaping::Advanced),
                     );
                 }
             }
