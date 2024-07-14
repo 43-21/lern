@@ -1,4 +1,7 @@
+use regex::Regex;
 use tokio_rusqlite::{Connection, Result};
+
+use crate::dictionary;
 
 pub async fn create_table(conn: &mut Connection) -> Result<()> {
     conn.call(
@@ -67,6 +70,8 @@ pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
 
 pub async fn blacklist_lemma(lemma: String) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
+
+    let lemma = dictionary::remove_accents(lemma);
 
     conn.call(
         move |conn| {

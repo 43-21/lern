@@ -7,6 +7,7 @@ use regex::Regex;
 use tokio_rusqlite::{params, Connection, Result, Transaction};
 use serde_json::Value;
 
+use crate::dictionary;
 use crate::dictionary::entry::{Entry, Example, Form, Pronunciation, Sense};
 
 
@@ -370,23 +371,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
                     }
                 }
 
-                let patterns = vec![
-                    (r"а́", "а"),
-                    (r"е́", "е"),
-                    (r"и́", "и"),
-                    (r"о́", "о"),
-                    (r"у́", "у"),
-                    (r"э́", "э"),
-                    (r"ы́", "ы"),
-                    (r"ю́", "ю"),
-                    (r"я́", "я"),
-                ];
-
-                let mut normalized = String::from(word);
-                for (pattern, replacement) in patterns {
-                    let re = Regex::new(pattern).unwrap();
-                    normalized = re.replace_all(&normalized, replacement).to_string();
-                }
+                let normalized = dictionary::remove_accents(word.to_owned());
 
                 form_stmt.execute(params![word, word_id, &normalized])?;
                 let form_id = ta.last_insert_rowid();
