@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{Button, Column, Container, Row, Text},
+    widget::{text::Shaping, Button, Column, Container, Row, Text},
     Alignment, Element, Task,
 };
 use iced_aw::TabLabel;
@@ -193,7 +193,7 @@ impl Tab for MainTab {
 
         let dictionary = {
             if self.dictionary {
-                Some("exists")
+                Some(Text::new("✓").shaping(Shaping::Advanced))
             } else {
                 None
             }
@@ -201,7 +201,7 @@ impl Tab for MainTab {
 
         let frequency = {
             if self.frequency {
-                Some("exists")
+                Some(Text::new("✓").shaping(Shaping::Advanced))
             } else {
                 None
             }
@@ -209,7 +209,7 @@ impl Tab for MainTab {
 
         let schedule = {
             if self.schedule {
-                Some("exists")
+                Some(Text::new("✓").shaping(Shaping::Advanced))
             } else {
                 None
             }
@@ -217,7 +217,7 @@ impl Tab for MainTab {
 
         let queue = {
             if self.queue {
-                Some("exists")
+                Some(Text::new("✓").shaping(Shaping::Advanced))
             } else {
                 None
             }
@@ -228,10 +228,10 @@ impl Tab for MainTab {
             .padding(20)
             .spacing(16)
             .push(
-                Button::new(Text::new("Load Dictionary File")).on_press(Message::SetWiktionaryFile),
+                Button::new(Text::new("Load dictionary file")).on_press(Message::SetWiktionaryFile),
             )
             .push(
-                Button::new(Text::new("Load Frequency File")).on_press(Message::SetFrequencyFile),
+                Button::new(Text::new("Load frequency file")).on_press(Message::SetFrequencyFile),
             );
 
         let create_row = Row::new()
@@ -239,8 +239,8 @@ impl Tab for MainTab {
             .padding(20)
             .spacing(16)
             .push_maybe(dictionary)
-            .push(Button::new(Text::new("Create Dictionary")).on_press_maybe(dictionary_msg))
-            .push(Button::new(Text::new("Create Frequencies")).on_press_maybe(frequency_msg))
+            .push(Button::new(Text::new("Create dictionary")).on_press_maybe(dictionary_msg))
+            .push(Button::new(Text::new("Create frequencies")).on_press_maybe(frequency_msg))
             .push_maybe(frequency);
 
         let clear_row = Row::new()
@@ -248,8 +248,8 @@ impl Tab for MainTab {
             .padding(20)
             .spacing(16)
             .push_maybe(schedule)
-            .push(Button::new(Text::new("Create Schedule")).on_press(Message::CreateSchedule))
-            .push(Button::new(Text::new("Create Queue")).on_press(Message::CreateQueue))
+            .push(Button::new(Text::new("Create schedule")).on_press(Message::CreateSchedule))
+            .push(Button::new(Text::new("Create queue")).on_press(Message::CreateQueue))
             .push_maybe(queue);
 
         let content: Element<'_, Message> = Container::new(
