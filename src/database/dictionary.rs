@@ -143,7 +143,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             (),
         )?;
         
-        conn.execute(
+        conn.execute_batch(
             "CREATE INDEX word_index ON words(word);
             CREATE INDEX word_form_index ON forms(word_id);
             CREATE INDEX form_tag_index ON form_tags(form_id);
@@ -151,8 +151,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             CREATE INDEX example_index ON examples(sense_id);
             CREATE INDEX sense_synonym_index ON sense_synonyms(sense_id);
             CREATE INDEX pronunciation_index ON pronunciation(word_id);
-            CREATE INDEX normalized_form_index ON forms(normalized_form);",
-            (),
+            CREATE INDEX normalized_form_index ON forms(normalized_form);"
         )?;
 
         
@@ -651,65 +650,5 @@ pub async fn lemmatize(forms: HashMap<String, usize>) -> Result<()> {
         println!("elapsed: {:?}", start.elapsed());
 
         Ok(())
-    }).await
-}
-
-pub async fn get_lemmas(forms: HashMap<String, usize>) -> Result<HashMap<String, usize>> {
-    let conn = Connection::open("./db/database.db").await?;
-    let mut batches = vec![HashMap::<String, usize>::new()];
-    let mut i = 0;
-    for (form, count) in forms {
-        if batches.get(i).unwrap().len() == 500 {
-            i += 1;
-            batches.push(HashMap::new());
-        }
-        batches.get_mut(i).unwrap().insert(form, count);
-    }
-    conn.call(|conn| {
-        let mut hash_map = HashMap::new();
-
-        let ta = conn.transaction()?;
-
-        for forms in batches {
-            let union = forms.into_iter().map(|(form, count)| {
-                format!(
-                    "SELECT word, {} AS count FROM joined_tables WHERE normalized_form = '{}' GROUP BY word_id", count, form)
-            }).collect::<Vec<String>>().join(" UNION ALL ");
-    
-            let query = format!(
-                "WITH joined_tables AS (
-                    SELECT word, word_id, normalized_form
-                    FROM words
-                    JOIN word_forms ON words.id = word_id
-                    JOIN forms ON forms.id = form_id
-                )
-                {}",
-                union
-            );
-    
-            let mut stmt: rusqlite::Statement = ta.prepare(&query)?;
-    
-            let mut start = std::time::Instant::now();
-
-            let lemmas = stmt.query_map((), |row| {
-                println!("elapsed: {:?}", start.elapsed());
-                start = std::time::Instant::now();
-                
-                Ok((row.get(0)?, row.get(1)?))
-            })?;
-
-
-
-            for lemma in lemmas {
-                let (lemma, count) = lemma?;
-                hash_map.insert(lemma, count);
-            }
-        }
-
-        println!("{}", hash_map.len());
-
-        ta.commit()?;
-
-        Ok(hash_map)
     }).await
 }
