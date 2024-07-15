@@ -230,30 +230,30 @@ impl Tab for AddTab {
         let button_row = if self.from_queue {
             Row::new()
                 .push(
-                    Button::new(Text::new("Ignore").horizontal_alignment(Horizontal::Center))
+                    Button::new(Text::new("Ignore").align_x(Horizontal::Center))
                         .width(Length::Fill)
                         .on_press(Message::Ignore),
                 )
                 .push(
-                    Button::new(Text::new("Add").horizontal_alignment(Horizontal::Center))
+                    Button::new(Text::new("Add").align_x(Horizontal::Center))
                         .width(Length::Fill)
                         .on_press(Message::Add),
                 )
                 .push(
-                    Button::new(Text::new("Blacklist").horizontal_alignment(Horizontal::Center))
+                    Button::new(Text::new("Blacklist").align_x(Horizontal::Center))
                         .width(Length::Fill)
                         .on_press(Message::Blacklist),
                 )
         } else {
             Row::new().push(
-                Button::new(Text::new("Add").horizontal_alignment(Horizontal::Center))
+                Button::new(Text::new("Add").align_x(Horizontal::Center))
                     .width(Length::Fill)
                     .on_press(Message::Add),
             )
         };
 
         let column = Column::new()
-            .align_items(Alignment::Center)
+            .align_x(Alignment::Center)
             .max_width(600)
             .padding(20)
             .spacing(16)
@@ -274,7 +274,7 @@ impl Tab for AddTab {
             .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue));
 
         let mut entry_column = Column::new()
-            .align_items(Alignment::Start)
+            .align_x(Alignment::Start)
             .padding(20)
             .spacing(16);
 
@@ -349,7 +349,7 @@ impl Tab for AddTab {
 
         let content: Element<'_, Message> = Container::new(
             Row::new()
-                .align_items(Alignment::Center)
+                .align_y(Alignment::Center)
                 .push(column.width(Length::Fill))
                 .push_maybe(entry_scrollable),
         )

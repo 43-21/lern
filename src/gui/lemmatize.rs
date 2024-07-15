@@ -70,7 +70,7 @@ impl Tab for LemmatizeTab {
     fn content(&self) -> iced::Element<'_, Self::Message> {
         let content: Element<'_, Message> = Container::new(
             Row::new()
-                .align_items(Alignment::Center)
+                .align_y(Alignment::Center)
                 .padding(20)
                 .spacing(16)
                 .push(

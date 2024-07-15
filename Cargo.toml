@@ -14,12 +14,13 @@ tokio-rusqlite = "0.5.1"
 
 [dependencies.iced]
 git = "https://github.com/iced-rs/iced.git"
-rev = "acf6daff46f8a0363a46f1957f481fa6625c7790"
+#rev = "acf6daff46f8a0363a46f1957f481fa6625c7790"
 features = ["tokio"]
 
 [dependencies.iced_aw]
-path = "./iced_aw/"
-#git = "https://github.com/iced-rs/iced_aw.git"
+#path = "./iced_aw/"
+git = "https://github.com/iced-rs/iced_aw.git"
+rev = "e5f12e1ac432607f9233203a77ed261f369e9168"
 #rev = "a6faf720c3b361218af3974f3589215dc8fe0ae2"
 default-features = false
 features = ["tabs"]

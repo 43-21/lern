@@ -224,7 +224,7 @@ impl Tab for MainTab {
         };
 
         let file_row = Row::new()
-            .align_items(Alignment::Center)
+            .align_y(Alignment::Center)
             .padding(20)
             .spacing(16)
             .push(
@@ -235,7 +235,7 @@ impl Tab for MainTab {
             );
 
         let create_row = Row::new()
-            .align_items(Alignment::Center)
+            .align_y(Alignment::Center)
             .padding(20)
             .spacing(16)
             .push_maybe(dictionary)
@@ -244,7 +244,7 @@ impl Tab for MainTab {
             .push_maybe(frequency);
 
         let clear_row = Row::new()
-            .align_items(Alignment::Center)
+            .align_y(Alignment::Center)
             .padding(20)
             .spacing(16)
             .push_maybe(schedule)
@@ -254,7 +254,7 @@ impl Tab for MainTab {
 
         let content: Element<'_, Message> = Container::new(
             Column::new()
-                .align_items(Alignment::Center)
+                .align_x(Alignment::Center)
                 .padding(20)
                 .spacing(16)
                 .push(file_row)

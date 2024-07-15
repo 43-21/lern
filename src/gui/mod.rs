@@ -101,7 +101,7 @@ trait Tab {
         let column = Column::new()
             .spacing(20)
             .push(self.content())
-            .align_items(iced::Alignment::Center);
+            .align_x(iced::Alignment::Center);
 
         Container::new(column)
             .width(Length::Fill)
