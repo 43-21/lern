@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use tokio::fs;
 use tokio_rusqlite::{Connection, Result};
 
 pub mod dictionary;
@@ -23,6 +24,8 @@ async fn init(conn: &Connection) -> Result<()> {
 }
 
 pub async fn create_schedule() -> Result<()> {
+    fs::create_dir_all("./db").await.unwrap();
+
     let mut conn = Connection::open("./db/database.db").await?;
 
     init(&conn).await?;
@@ -33,6 +36,8 @@ pub async fn create_schedule() -> Result<()> {
 }
 
 pub async fn create_queue() -> Result<()> {
+    fs::create_dir_all("./db").await.unwrap();
+
     let mut conn = Connection::open("./db/database.db").await?;
 
     init(&conn).await?;
@@ -43,6 +48,8 @@ pub async fn create_queue() -> Result<()> {
 }
 
 pub async fn create_dictionary(wiktionary_path: PathBuf) -> Result<()> {
+    fs::create_dir_all("./db").await.unwrap();
+
     let conn = Connection::open("./db/database.db").await?;
 
     init(&conn).await?;
@@ -53,6 +60,8 @@ pub async fn create_dictionary(wiktionary_path: PathBuf) -> Result<()> {
 }
 
 pub async fn create_frequency(frequency_path: PathBuf) -> Result<()> {
+    fs::create_dir_all("./db").await.unwrap();
+
     let conn = Connection::open("./db/database.db").await?;
 
     init(&conn).await?;
