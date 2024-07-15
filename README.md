@@ -4,3 +4,5 @@ In dessen Cargo.toml sollten Sie dann unter [dependencies.iced] rev = "950bfc07d
 Tut mir leid, ich weiß leider nicht, wie das besser geht, ohne die veränderte Version von iced_aw hier mit hochzuladen.
 
 Error-Handling, GUI und so weiter sind leider noch suboptimal, da ich den Fokus erstmal auf ein funktionales MVP gelegt habe. Der Code unter src/fsrs wird noch nicht verwendet und ist auch noch nicht vollständig, ist aber für die Vokabelabfrage geplant.
+
+Die JSONL-Datei zu den Wiktionary-Einträgen können Sie auf https://kaikki.org/dictionary/Russian/ herunterladen.
