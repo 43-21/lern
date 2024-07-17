@@ -1,11 +1,12 @@
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        text::Shaping, Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput,
+        text::Shaping, text_input::{focus, Id}, Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput
     },
     Alignment, Element, Length, Task,
 };
 use iced_aw::TabLabel;
+use once_cell::sync::Lazy;
 
 use crate::{
     database::{dictionary, queue, schedule},
@@ -14,6 +15,8 @@ use crate::{
 };
 
 use super::Tab;
+
+static INPUT_ID: Lazy<Id> = Lazy::new(Id::unique);
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -199,7 +202,7 @@ impl AddTab {
                     self.next_word = None;
                 }
 
-                Task::done(Message::Preload)
+                Task::batch([Task::done(Message::Preload), focus(INPUT_ID.clone())])
             }
             Message::Preload => {
                 if self.lemmas.is_empty() {
@@ -265,6 +268,7 @@ impl Tab for AddTab {
             )
             .push(
                 TextInput::new("Native", &self.native)
+                    .id(INPUT_ID.clone())
                     .on_input(Message::NativeChanged)
                     .padding(10)
                     .size(32)
