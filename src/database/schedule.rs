@@ -5,6 +5,8 @@ use tokio_rusqlite::{params, Connection, Result};
 
 use crate::fsrs::card::Card;
 
+use super::queue;
+
 pub async fn create_table(conn: &mut Connection) -> Result<()> {
     conn.call(
         |conn| {
@@ -64,6 +66,8 @@ pub async fn get_due_cards(conn: &mut Connection, time: u64) -> Result<Vec<Card>
 
 pub async fn insert_card(card: Card) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
+    
+    queue::blacklist_lemma(card.native.clone()).await?;
     
     conn.call(
         move |conn| {
