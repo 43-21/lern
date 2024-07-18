@@ -2,16 +2,16 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
-
-use tokio_rusqlite::{params, Connection, Result, Transaction};
 use serde_json::Value;
+use tokio_rusqlite::{params, Connection, Result, Transaction};
 
 use crate::dictionary;
 use crate::dictionary::entry::{Entry, Example, Form, Pronunciation, Sense};
 
-
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where P: AsRef<Path>, {
+where
+    P: AsRef<Path>,
+{
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
 }
@@ -31,7 +31,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             DROP TABLE IF EXISTS synonyms;
             DROP TABLE IF EXISTS forms;
             DROP TABLE IF EXISTS frequency;
-            DROP TABLE IF EXISTS words;"
+            DROP TABLE IF EXISTS words;",
         )?;
 
         conn.execute_batch(
@@ -42,7 +42,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             DROP INDEX IF EXISTS example_index;
             DROP INDEX IF EXISTS sense_synonym_index;
             DROP INDEX IF EXISTS pronunciation_index;
-            DROP INDEX IF EXISTS normalized_form_index;"
+            DROP INDEX IF EXISTS normalized_form_index;",
         )?;
 
         conn.execute(
@@ -76,7 +76,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-    
+
         conn.execute(
             "CREATE TABLE pronunciation (
                 id INTEGER PRIMARY KEY,
@@ -86,7 +86,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-    
+
         conn.execute(
             "CREATE TABLE forms (
                 id INTEGER PRIMARY KEY,
@@ -97,7 +97,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-    
+
         conn.execute(
             "CREATE TABLE synonyms (
                 id INTEGER PRIMARY KEY,
@@ -105,7 +105,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-    
+
         conn.execute(
             "CREATE TABLE sense_synonyms (
                 sense_id INTEGER NOT NULL,
@@ -115,7 +115,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-    
+
         conn.execute(
             "CREATE TABLE form_tags (
                 form_id INTEGER NOT NULL,
@@ -124,7 +124,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-    
+
         conn.execute(
             "CREATE TABLE pronunciation_tags (
                 pronunciation_id INTEGER NOT NULL,
@@ -133,7 +133,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-    
+
         conn.execute(
             "CREATE TABLE sense_tags (
                 sense_id INTEGER NOT NULL,
@@ -142,7 +142,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             )",
             (),
         )?;
-        
+
         conn.execute_batch(
             "CREATE INDEX word_index ON words(word);
             CREATE INDEX word_form_index ON forms(word_id);
@@ -151,52 +151,61 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
             CREATE INDEX example_index ON examples(sense_id);
             CREATE INDEX sense_synonym_index ON sense_synonyms(sense_id);
             CREATE INDEX pronunciation_index ON pronunciation(word_id);
-            CREATE INDEX normalized_form_index ON forms(normalized_form);"
+            CREATE INDEX normalized_form_index ON forms(normalized_form);",
         )?;
 
-        
         let start = std::time::Instant::now();
-    
+
         let mut ta = conn.transaction()?;
         insert_data(&mut ta, path_to_wiktionary)?;
         ta.commit()?;
-    
+
         let duration = start.elapsed();
         println!("Time elapsed for insertion: {:?}", duration);
-    
+
         Ok(())
-    }).await?;
+    })
+    .await?;
 
     conn.close().await?;
     Ok(())
 }
 
 fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> {
-    let mut word_stmt_expansion = ta.prepare("INSERT INTO words (word, pos, expansion) VALUES (?1, ?2, ?3)")?;
-    let mut word_stmt_etymology_expansion = ta.prepare("INSERT INTO words (word, pos, etymology, expansion) VALUES (?1, ?2, ?3, ?4)")?;
-    let mut word_stmt_etymology = ta.prepare("INSERT INTO words (word, pos, etymology) VALUES (?1, ?2, ?3)")?;
+    let mut word_stmt_expansion =
+        ta.prepare("INSERT INTO words (word, pos, expansion) VALUES (?1, ?2, ?3)")?;
+    let mut word_stmt_etymology_expansion =
+        ta.prepare("INSERT INTO words (word, pos, etymology, expansion) VALUES (?1, ?2, ?3, ?4)")?;
+    let mut word_stmt_etymology =
+        ta.prepare("INSERT INTO words (word, pos, etymology) VALUES (?1, ?2, ?3)")?;
     let mut word_stmt = ta.prepare("INSERT INTO words (word, pos) VALUES (?1, ?2)")?;
 
-    let mut sense_stmt_gloss = ta.prepare("INSERT INTO senses (word_id, sense, relevance) VALUES (?1, ?2, ?3)")?;
+    let mut sense_stmt_gloss =
+        ta.prepare("INSERT INTO senses (word_id, sense, relevance) VALUES (?1, ?2, ?3)")?;
     let mut sense_stmt = ta.prepare("INSERT INTO senses (word_id, relevance) VALUES (?1, ?2)")?;
-    let mut sense_tag_stmt = ta.prepare("INSERT INTO sense_tags (sense_id, tag) VALUES (?1, ?2)")?;
-    
-    let mut example_stmt_english = ta.prepare("INSERT INTO examples (sense_id, text, english) VALUES (?1, ?2, ?3)")?;
+    let mut sense_tag_stmt =
+        ta.prepare("INSERT INTO sense_tags (sense_id, tag) VALUES (?1, ?2)")?;
+
+    let mut example_stmt_english =
+        ta.prepare("INSERT INTO examples (sense_id, text, english) VALUES (?1, ?2, ?3)")?;
     let mut example_stmt = ta.prepare("INSERT INTO examples (sense_id, text) VALUES (?1, ?2)")?;
 
     let mut synonym_stmt = ta.prepare("INSERT INTO synonyms (synonym) VALUES (?1)")?;
-    let mut sense_synonym_stmt = ta.prepare("INSERT INTO sense_synonyms (sense_id, synonym_id) VALUES (?1, ?2)")?;
+    let mut sense_synonym_stmt =
+        ta.prepare("INSERT INTO sense_synonyms (sense_id, synonym_id) VALUES (?1, ?2)")?;
 
-    let mut form_stmt = ta.prepare("INSERT INTO forms (form, word_id, normalized_form) VALUES (?1, ?2, ?3)")?;
+    let mut form_stmt =
+        ta.prepare("INSERT INTO forms (form, word_id, normalized_form) VALUES (?1, ?2, ?3)")?;
     let mut form_tag_stmt = ta.prepare("INSERT INTO form_tags (form_id, tag) VALUES (?1, ?2)")?;
 
-    let mut pronunciation_stmt = ta.prepare("INSERT INTO pronunciation (word_id, ipa) VALUES (?1, ?2)")?;
-    let mut pronunciation_tag_stmt = ta.prepare("INSERT INTO pronunciation_tags (pronunciation_id, tag) VALUES (?1, ?2)")?;
+    let mut pronunciation_stmt =
+        ta.prepare("INSERT INTO pronunciation (word_id, ipa) VALUES (?1, ?2)")?;
+    let mut pronunciation_tag_stmt =
+        ta.prepare("INSERT INTO pronunciation_tags (pronunciation_id, tag) VALUES (?1, ?2)")?;
 
     let lines = read_lines(path_to_wiktionary).unwrap();
 
-    'iteration:
-    for line in lines.flatten() {
+    'iteration: for line in lines.flatten() {
         let json: serde_json::Value = serde_json::from_str(&line).unwrap();
 
         let word = json.get("word").unwrap().as_str().unwrap();
@@ -204,22 +213,31 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
         let etymology = {
             if let Some(etymology) = json.get("etymology_text") {
                 Some(etymology.as_str().unwrap())
-            }
-            else {
+            } else {
                 None
             }
         };
 
-        if !vec!["noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron"].contains(&pos) {
+        if !vec![
+            "noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron",
+        ]
+        .contains(&pos)
+        {
             continue 'iteration;
         }
 
         let head_templates = json.get("head_templates");
         let expansion = {
             if let Some(head_templates) = head_templates {
-                head_templates.as_array().unwrap().get(0).unwrap().get("expansion").unwrap().as_str()
-            }
-            else {
+                head_templates
+                    .as_array()
+                    .unwrap()
+                    .get(0)
+                    .unwrap()
+                    .get("expansion")
+                    .unwrap()
+                    .as_str()
+            } else {
                 None
             }
         };
@@ -227,8 +245,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
         let json_senses = json.get("senses").unwrap().as_array().unwrap();
         let mut senses = Vec::new();
 
-        'senses:
-        for sense in json_senses {
+        'senses: for sense in json_senses {
             if sense.get("form_of").is_some() {
                 continue;
             }
@@ -250,14 +267,11 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
         if let (Some(etymology), Some(expansion)) = (etymology, expansion) {
             word_stmt_etymology_expansion.execute([word, pos, etymology, expansion])?;
-        }
-        else if let Some(etymology) = etymology {
+        } else if let Some(etymology) = etymology {
             word_stmt_etymology.execute([word, pos, etymology])?;
-        }
-        else if let Some(expansion) = expansion {
+        } else if let Some(expansion) = expansion {
             word_stmt_expansion.execute([word, pos, expansion])?;
-        }
-        else {
+        } else {
             word_stmt.execute([word, pos])?;
         }
 
@@ -268,27 +282,23 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
             let gloss = {
                 if let Some(glosses) = sense.get("glosses") {
                     Some(glosses.as_array().unwrap()[0].as_str().unwrap())
-                }
-                else {
+                } else {
                     None
                 }
             };
-            
+
             if let Some(gloss) = gloss {
                 sense_stmt_gloss.execute(params![word_id, gloss, i])?;
-            }
-
-            else {
+            } else {
                 sense_stmt.execute(params![word_id, i])?;
             }
 
             let sense_id = ta.last_insert_rowid();
-            
+
             let tags = {
                 if let Some(tags) = sense.get("tags") {
                     tags.as_array().unwrap().to_owned()
-                }
-                else {
+                } else {
                     Vec::<Value>::new()
                 }
             };
@@ -302,8 +312,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
             let examples = {
                 if let Some(examples) = sense.get("examples") {
                     examples.as_array().unwrap().to_owned()
-                }
-                else {
+                } else {
                     Vec::<Value>::new()
                 }
             };
@@ -313,19 +322,16 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
                 let english = {
                     if let Some(english) = example.get("english") {
                         Some(english.as_str().unwrap())
-                    }
-                    else {
+                    } else {
                         None
                     }
                 };
 
                 if let Some(english) = english {
                     example_stmt_english.execute(params![sense_id, text, english])?;
-                }
-                else {
+                } else {
                     example_stmt.execute(params![sense_id, text])?;
                 }
-
             }
 
             if let Some(synonyms) = sense.get("synonyms") {
@@ -340,13 +346,11 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
                 }
             }
         }
-        
 
         if let Some(forms) = json.get("forms") {
             let forms = forms.as_array().unwrap();
-            
-            'forms:
-            for form in forms {
+
+            'forms: for form in forms {
                 let word = form.get("form").unwrap().as_str().unwrap();
 
                 let source = form.get("source");
@@ -408,53 +412,45 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
     let conn = Connection::open("./db/database.db").await?;
 
-    let entries = conn.call(
-        |conn| {
+    let entries = conn
+        .call(|conn| {
             let ta = conn.transaction()?;
-            let mut word_stmt = ta.prepare(
-                "SELECT * FROM words WHERE word = ?1"
-            )?;
-        
+            let mut word_stmt = ta.prepare("SELECT * FROM words WHERE word = ?1")?;
+
             let mut form_stmt = ta.prepare(
                 "SELECT forms.id, form FROM forms
-                WHERE word_id = ?1"
+                WHERE word_id = ?1",
             )?;
-        
-            let mut form_tag_stmt = ta.prepare(
-                "SELECT tag FROM form_tags WHERE form_id = ?1"
-            )?;
-        
-            let mut sense_stmt = ta.prepare(
-                "SELECT id, sense FROM senses WHERE word_id = ?1 ORDER BY relevance"
-            )?;
-        
-            let mut example_stmt = ta.prepare(
-                "SELECT text, english FROM examples WHERE sense_id = ?1"
-            )?;
-        
+
+            let mut form_tag_stmt = ta.prepare("SELECT tag FROM form_tags WHERE form_id = ?1")?;
+
+            let mut sense_stmt =
+                ta.prepare("SELECT id, sense FROM senses WHERE word_id = ?1 ORDER BY relevance")?;
+
+            let mut example_stmt =
+                ta.prepare("SELECT text, english FROM examples WHERE sense_id = ?1")?;
+
             let mut synonym_stmt = ta.prepare(
                 "SELECT synonym FROM synonyms
                 JOIN sense_synonyms ON synonyms.id = synonym_id
                 JOIN senses ON senses.id = sense_id
-                WHERE sense_id = ?1"
+                WHERE sense_id = ?1",
             )?;
-        
-            let mut sense_tag_stmt = ta.prepare(
-                "SELECT tag FROM sense_tags JOIN senses ON sense_id = id WHERE id = ?1"
-            )?;
-        
-            let mut pronunciation_stmt = ta.prepare(
-                "SELECT id, ipa FROM pronunciation WHERE word_id = ?1"
-            )?;
-        
+
+            let mut sense_tag_stmt = ta
+                .prepare("SELECT tag FROM sense_tags JOIN senses ON sense_id = id WHERE id = ?1")?;
+
+            let mut pronunciation_stmt =
+                ta.prepare("SELECT id, ipa FROM pronunciation WHERE word_id = ?1")?;
+
             let mut pronunciation_tag_stmt = ta.prepare(
                 "SELECT tag FROM pronunciation_tags
                 JOIN pronunciation ON id = pronunciation_id
-                WHERE id = ?1"
+                WHERE id = ?1",
             )?;
-        
+
             let mut entries = Vec::new();
-        
+
             let entry_iter = word_stmt.query_map([word], |row| {
                 let id: i64 = row.get(0)?;
                 let word: String = row.get(1)?;
@@ -463,85 +459,76 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                 let expansion: Option<String> = row.get(4)?;
                 Ok((id, word, pos, etymology, expansion))
             })?;
-        
+
             for entry in entry_iter {
                 let (id, word, pos, etymology, expansion) = entry?;
-        
+
                 let mut forms = Vec::new();
                 let mut senses = Vec::new();
                 let mut pronunciations = Vec::new();
-        
+
                 let form_iter = form_stmt.query_map([id], |row| {
                     let id: i64 = row.get(0)?;
                     let form: String = row.get(1)?;
-        
+
                     Ok((id, form))
                 })?;
-        
+
                 for form in form_iter {
                     let (id, form) = form?;
-        
+
                     let mut tags = Vec::new();
-        
-                    let tag_iter = form_tag_stmt.query_map([id], |row| {
-                        row.get::<usize, String>(0)
-                    })?;
-        
+
+                    let tag_iter =
+                        form_tag_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
+
                     for tag in tag_iter {
                         tags.push(tag?);
                     }
-        
-                    forms.push(Form {
-                        form,
-                        tags,
-                    });
+
+                    forms.push(Form { form, tags });
                 }
-        
+
                 let sense_iter = sense_stmt.query_map([id], |row| {
                     let id: i64 = row.get(0)?;
                     let sense: String = row.get(1)?;
-        
+
                     Ok((id, sense))
                 })?;
-        
+
                 for sense in sense_iter {
                     let (id, sense) = sense?;
-        
+
                     let mut examples = Vec::new();
                     let mut synonyms = Vec::new();
                     let mut tags = Vec::new();
-                    
+
                     let example_iter = example_stmt.query_map([id], |row| {
                         let text: String = row.get(0)?;
                         let english: Option<String> = row.get(1)?;
-        
+
                         Ok((text, english))
                     })?;
-        
+
                     for example in example_iter {
                         let (text, english) = example?;
-                        examples.push(Example {
-                            text,
-                            english,
-                        })
+                        examples.push(Example { text, english })
                     }
-        
-                    let synonym_iter = synonym_stmt.query_map([id], |row| {
-                        row.get::<usize, String>(0)
-                    })?;
-        
+
+                    let synonym_iter =
+                        synonym_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
+
                     for synonym in synonym_iter {
                         synonyms.push(synonym?);
                     }
-        
-                    let tag_iter = sense_tag_stmt.query_map([id], |row| {
-                        row.get::<usize, String>(0)
-                    })?;
-        
+
+                    let tag_iter =
+                        sense_tag_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
+
                     for tag in tag_iter {
                         tags.push(tag?);
                     }
-        
+
                     senses.push(Sense {
                         sense,
                         examples,
@@ -549,33 +536,29 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                         tags,
                     })
                 }
-        
+
                 let pronunciation_iter = pronunciation_stmt.query_map([id], |row| {
                     let id: i64 = row.get(0)?;
                     let ipa: String = row.get(1)?;
-        
+
                     Ok((id, ipa))
                 })?;
-        
+
                 for pronunciation in pronunciation_iter {
                     let (id, ipa) = pronunciation?;
-        
+
                     let mut tags = Vec::new();
-        
-                    let tag_iter = pronunciation_tag_stmt.query_map([id], |row| {
-                        row.get::<usize, String>(0)
-                    })?;
-        
+
+                    let tag_iter = pronunciation_tag_stmt
+                        .query_map([id], |row| row.get::<usize, String>(0))?;
+
                     for tag in tag_iter {
                         tags.push(tag?);
                     }
-        
-                    pronunciations.push(Pronunciation {
-                        ipa,
-                        tags,
-                    })
+
+                    pronunciations.push(Pronunciation { ipa, tags })
                 }
-        
+
                 entries.push(Entry {
                     word,
                     pos,
@@ -586,7 +569,7 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                     pronunciations,
                 })
             }
-        
+
             drop(word_stmt);
             drop(form_stmt);
             drop(form_tag_stmt);
@@ -596,37 +579,40 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
             drop(synonym_stmt);
             drop(pronunciation_stmt);
             drop(pronunciation_tag_stmt);
-        
+
             ta.commit()?;
-        
+
             Ok(entries)
-        }
-    ).await?;
+        })
+        .await?;
 
     Ok(entries)
 }
 
-pub async fn lemmatize(forms: HashMap<String, usize>) -> Result<()> {
+pub async fn lemmatize(forms: HashMap<String, (usize, usize)>) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
     conn.call(|conn| {
         let ta = conn.transaction()?;
 
-        let mut stmt = ta.prepare(
+        let max_first_occurence: usize = ta.query_row("SELECT MAX(first_occurence) FROM lemmas", [], |row| {
+            row.get(0)
+        }).unwrap_or(0);
+
+        let mut stmt: rusqlite::Statement = ta.prepare(
             "INSERT INTO lemmas
-            SELECT w.word, ?1 as frequency, frequency.frequency AS general_frequency, 0 AS blacklisted
+            SELECT w.word, ?1 as frequency, frequency.frequency as general_frequency, 0 as blacklisted, ?2 as first_occurence
                 FROM words w
                 JOIN forms ON forms.word_id = w.id
                 JOIN frequency ON w.id = frequency.word_id
-                WHERE normalized_form = ?2
+                WHERE normalized_form = ?3
                 GROUP BY w.id
             ON CONFLICT(lemma) DO UPDATE SET frequency = frequency + ?1"
         )?;
 
         let start = std::time::Instant::now();
-        for (form, frequency) in forms {
-            stmt.execute(params![frequency, form])?;
+        for (form, (frequency, first_occurence)) in forms {
+            stmt.execute(params![frequency, max_first_occurence + first_occurence, form])?;
         }
-
         drop(stmt);
 
         ta.commit()?;

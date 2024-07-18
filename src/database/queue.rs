@@ -3,21 +3,21 @@ use tokio_rusqlite::{Connection, Result};
 use crate::dictionary;
 
 pub async fn create_table(conn: &mut Connection) -> Result<()> {
-    conn.call(
-        |conn| {
-            conn.execute("DROP TABLE IF EXISTS lemmas", (),)?;
-            conn.execute(
-                "CREATE TABLE lemmas (
+    conn.call(|conn| {
+        conn.execute("DROP TABLE IF EXISTS lemmas", ())?;
+        conn.execute(
+            "CREATE TABLE lemmas (
                     lemma TEXT PRIMARY KEY,
                     frequency INTEGER NOT NULL,
                     general_frequency INTEGER,
-                    blacklisted INTEGER NOT NULL CHECK (blacklisted IN (0, 1))
+                    blacklisted INTEGER NOT NULL CHECK (blacklisted IN (0, 1)),
+                    first_occurence INTEGER NOT NULL
                 )",
-                ()
-            )?;        
-            Ok(())
-        }
-    ).await?;
+            (),
+        )?;
+        Ok(())
+    })
+    .await?;
 
     Ok(())
 }
@@ -27,26 +27,33 @@ pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
 
     let queue = conn.call(move |conn| {
         let mut stmt = conn.prepare(
-            "SELECT lemma FROM (
-                SELECT lemma, frequency, general_frequency,
+            "SELECT lemma,
+            MIN(row_num_by_frequency, row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS smallest,
+            MAX(row_num_by_frequency, row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS largest
+            FROM (
+                SELECT lemma,
                 ROW_NUMBER() OVER (
                     ORDER BY frequency DESC
                 ) AS row_num_by_frequency,
                 ROW_NUMBER() OVER (
                     ORDER BY general_frequency
-                ) AS row_num_by_general_frequency
+                ) AS row_num_by_general_frequency,
+                ROW_NUMBER() OVER (
+                    ORDER BY first_occurence
+                ) AS row_num_by_first_occurence
                 FROM lemmas
                 WHERE blacklisted = 0
             ) temp_table
             ORDER BY
+                smallest,
                 CASE
-                    WHEN row_num_by_frequency < row_num_by_general_frequency THEN row_num_by_frequency
-                    ELSE row_num_by_general_frequency
+                    WHEN smallest < row_num_by_frequency AND row_num_by_frequency < largest
+                        THEN row_num_by_frequency
+                    WHEN smallest < row_num_by_general_frequency AND row_num_by_general_frequency < largest
+                        THEN row_num_by_general_frequency
+                    ELSE 1.5 * row_num_by_first_occurence
                 END,
-                CASE
-                    WHEN row_num_by_frequency < row_num_by_general_frequency THEN row_num_by_general_frequency
-                    ELSE row_num_by_frequency
-                END
+                largest
             LIMIT ?1,200")?;
 
         let rows = stmt.query_map([start], |row| {
@@ -72,17 +79,15 @@ pub async fn blacklist_lemma(lemma: String) -> Result<()> {
 
     let lemma = dictionary::remove_accents(lemma);
 
-    conn.call(
-        move |conn| {
-            conn.execute(
-                "UPDATE lemmas
+    conn.call(move |conn| {
+        conn.execute(
+            "UPDATE lemmas
                 SET blacklisted = 1
                 WHERE lemma = ?1",
-                [lemma]
-            )?;
+            [lemma],
+        )?;
 
-
-            Ok(())
-        }
-    ).await
+        Ok(())
+    })
+    .await
 }

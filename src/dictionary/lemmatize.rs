@@ -14,8 +14,9 @@ pub async fn lemmatize(text: String) -> Result<()> {
         .collect();
 
     let mut hash_map = HashMap::new();
-    for form in forms {
-        *hash_map.entry(form).or_insert(0) += 1;
+    for (i, form) in forms.into_iter().enumerate() {
+        let entry = hash_map.entry(form).or_insert((0, i));
+        entry.0 += 1;
     }
 
     dictionary::lemmatize(hash_map).await
