@@ -2,8 +2,8 @@
 #![allow(dead_code)]
 
 mod database;
-mod dictionary;
 mod fsrs;
+mod dictionary;
 mod gui;
 
 fn main() {

@@ -1,9 +1,7 @@
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        text::Shaping,
-        text_input::{focus, Id},
-        Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput,
+        text::Shaping, text_input::{focus, Id}, Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput
     },
     Alignment, Element, Length, Task,
 };

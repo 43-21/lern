@@ -1,7 +1,7 @@
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{text_editor, Button, Container, Row, Text},
-    Alignment, Element, Length, Task,
+    Alignment, Element, Length, Task
 };
 use iced_aw::TabLabel;
 
@@ -36,14 +36,16 @@ impl LemmatizeTab {
                 self.content.perform(action);
                 Task::none()
             }
-            Message::Lemmatize => {
+            Message::Lemmatize => {      
                 let text = self.content.text();
                 self.content = text_editor::Content::new();
-                self.is_dirty = false;
+                self.is_dirty = false;       
 
-                Task::future(lemmatize(text)).then(|result| match result {
-                    Ok(()) => Task::none(),
-                    Err(e) => Task::done(Message::Error(e.to_string())),
+                Task::future(lemmatize(text)).then(|result| {
+                    match result {
+                        Ok(()) => Task::none(),
+                        Err(e) => Task::done(Message::Error(e.to_string()))
+                    }
                 })
             }
             Message::Error(e) => {
@@ -73,10 +75,13 @@ impl Tab for LemmatizeTab {
                 .spacing(16)
                 .push(
                     text_editor(&self.content)
-                        .height(Length::Fill)
-                        .on_action(Message::ActionPerformed),
+                    .height(Length::Fill)
+                    .on_action(Message::ActionPerformed)
                 )
-                .push(Button::new(Text::new("Lemmatize")).on_press(Message::Lemmatize)),
+                .push(
+                    Button::new(Text::new("Lemmatize"))
+                    .on_press(Message::Lemmatize)
+                )
         )
         .align_x(Horizontal::Center)
         .align_y(Vertical::Center)

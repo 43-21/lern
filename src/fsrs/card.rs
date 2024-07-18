@@ -5,7 +5,7 @@ pub struct Card {
     pub native: String,
     pub russian: String,
 
-    pub due: u64,       //epoch timestamp
+    pub due: u64, //epoch timestamp
     pub stability: f64, //in days
     pub difficulty: f64,
 }
@@ -36,7 +36,7 @@ impl Card {
 
         self.due += days_to_seconds(interval);
     }
-
+    
     /// First memory state
     pub fn initial_schedule(&mut self, grade: Grade) {
         let stability = initial_stability(grade);
@@ -60,8 +60,8 @@ fn initial_difficulty(grade: Grade) -> f64 {
 }
 
 fn new_difficulty(difficulty: f64, grade: Grade) -> f64 {
-    WEIGHTS[7] * initial_difficulty(Grade::Good)
-        + (1f64 - WEIGHTS[7]) * (difficulty - WEIGHTS[6] * (grade as i32 - 3) as f64)
+    WEIGHTS[7] * initial_difficulty(Grade::Good) +
+    (1f64 - WEIGHTS[7]) * (difficulty - WEIGHTS[6] * (grade as i32 - 3) as f64)
 }
 
 fn retrievability(time: usize, stability: f64) -> f64 {
@@ -80,31 +80,19 @@ fn new_stability(stability: f64, difficulty: f64, retrievability: f64, grade: Gr
     }
 }
 
-fn stability_after_recall(
-    stability: f64,
-    difficulty: f64,
-    retrievability: f64,
-    grade: Grade,
-) -> f64 {
+fn stability_after_recall(stability: f64, difficulty: f64, retrievability: f64, grade: Grade) -> f64 {
     let factor = match grade {
         Grade::Hard => WEIGHTS[15],
         Grade::Easy => WEIGHTS[16],
         _ => 1.0,
     };
 
-    stability
-        * (WEIGHTS[8].exp()
-            * (11.0 - difficulty)
-            * stability.powf(-WEIGHTS[9])
-            * ((WEIGHTS[10] * (1.0 - retrievability)).exp() - 1.0)
-            * factor
-            + 1.0)
+    stability * (WEIGHTS[8].exp() * (11.0 - difficulty) * stability.powf(-WEIGHTS[9]) *
+    ((WEIGHTS[10] * (1.0 - retrievability)).exp() - 1.0) * factor + 1.0)
 }
 
 /// Calculates the new stability of a card that has been forgotten
 fn post_lapse_stability(stability: f64, difficulty: f64, retrievability: f64) -> f64 {
-    WEIGHTS[11]
-        * difficulty.powf(-WEIGHTS[12])
-        * ((stability + 1.0).powf(WEIGHTS[13]) - 1.0)
-        * (WEIGHTS[14] * (1.0 - retrievability)).exp()
+    WEIGHTS[11] * difficulty.powf(-WEIGHTS[12]) *
+    ((stability + 1.0).powf(WEIGHTS[13]) - 1.0) * (WEIGHTS[14] * (1.0 - retrievability)).exp()
 }
