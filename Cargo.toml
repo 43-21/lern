@@ -21,6 +21,5 @@ features = ["tokio"]
 [dependencies.iced_aw]
 #path = "./iced_aw/"
 git = "https://github.com/iced-rs/iced_aw.git"
-rev = "e5f12e1ac432607f9233203a77ed261f369e9168"
 default-features = false
 features = ["tabs"]
