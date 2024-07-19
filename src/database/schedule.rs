@@ -64,7 +64,7 @@ pub async fn get_due_cards(conn: &mut Connection, time: u64) -> Result<Vec<Card>
 pub async fn insert_card(card: Card) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
 
-    queue::blacklist_lemma(card.native.clone()).await?;
+    queue::blacklist_lemma(card.russian.clone()).await?;
 
     conn.call(move |conn| {
         conn.execute(
