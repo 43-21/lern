@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{text::Shaping, Button, Column, Container, Row, Text},
+    widget::{text::Shaping, Button, Checkbox, Column, Container, Row, Text},
     Alignment, Element, Task,
 };
 use iced_aw::TabLabel;
@@ -19,6 +19,7 @@ pub struct MainTab {
     schedule: bool,
     frequency: bool,
     queue: bool,
+    keep_blacklist: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +40,7 @@ pub enum Message {
     SetExportLocation,
     Export { path: Option<PathBuf> },
     Exported,
+    KeepBlacklist(bool),
 }
 
 impl MainTab {
@@ -50,6 +52,7 @@ impl MainTab {
             schedule: false,
             frequency: false,
             queue: false,
+            keep_blacklist: true,
         }
     }
 
@@ -101,7 +104,7 @@ impl MainTab {
                     Ok(()) => Message::ScheduleCreated,
                 })
             }
-            Message::CreateQueue => Task::perform(database::create_queue(), |res| match res {
+            Message::CreateQueue => Task::perform(database::create_queue(self.keep_blacklist), |res| match res {
                 Err(e) => Message::Error(e.to_string()),
                 Ok(()) => Message::QueueCreated,
             }),
@@ -158,6 +161,10 @@ impl MainTab {
             },
             Message::Exported => {
                 println!("exported!");
+                Task::none()
+            }
+            Message::KeepBlacklist(keep_blacklist) => {
+                self.keep_blacklist = keep_blacklist;
                 Task::none()
             }
         }
@@ -250,6 +257,7 @@ impl Tab for MainTab {
             .push_maybe(schedule)
             .push(Button::new(Text::new("Create schedule")).on_press(Message::CreateSchedule))
             .push(Button::new(Text::new("Create queue")).on_press(Message::CreateQueue))
+            .push(Checkbox::new("Keep blacklist", self.keep_blacklist).on_toggle(Message::KeepBlacklist))
             .push_maybe(queue);
 
         let content: Element<'_, Message> = Container::new(

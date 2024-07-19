@@ -2,19 +2,34 @@ use tokio_rusqlite::{Connection, Result};
 
 use crate::dictionary;
 
-pub async fn create_table(conn: &mut Connection) -> Result<()> {
-    conn.call(|conn| {
-        conn.execute("DROP TABLE IF EXISTS lemmas", ())?;
-        conn.execute(
-            "CREATE TABLE lemmas (
-                    lemma TEXT PRIMARY KEY,
-                    frequency INTEGER NOT NULL,
-                    general_frequency INTEGER,
-                    blacklisted INTEGER NOT NULL CHECK (blacklisted IN (0, 1)),
-                    first_occurence INTEGER NOT NULL
-                )",
-            (),
-        )?;
+pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result<()> {
+    conn.call(move |conn| {
+        let row: rusqlite::Result<String> = conn.query_row("SELECT name FROM sqlite_schema WHERE type='table' AND name='lemmas'", [], |row| {
+            row.get(0)
+        });
+
+        let table_exists = row.is_ok();
+
+        if table_exists && keep_blacklist {
+            conn.execute(
+                "DELETE FROM lemmas WHERE blacklisted = 0",
+                ()
+            )?;
+        }
+
+        else {
+            conn.execute("DROP TABLE IF EXISTS lemmas", ())?;
+            conn.execute(
+                "CREATE TABLE lemmas (
+                        lemma TEXT PRIMARY KEY,
+                        frequency INTEGER NOT NULL,
+                        general_frequency INTEGER,
+                        blacklisted INTEGER NOT NULL CHECK (blacklisted IN (0, 1)),
+                        first_occurence INTEGER NOT NULL
+                    )",
+                (),
+            )?;        
+        }
         Ok(())
     })
     .await?;

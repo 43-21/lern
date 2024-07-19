@@ -35,14 +35,14 @@ pub async fn create_schedule() -> Result<()> {
     Ok(())
 }
 
-pub async fn create_queue() -> Result<()> {
+pub async fn create_queue(keep_blacklist: bool) -> Result<()> {
     fs::create_dir_all("./db").await.unwrap();
 
     let mut conn = Connection::open("./db/database.db").await?;
 
     init(&conn).await?;
 
-    queue::create_table(&mut conn).await?;
+    queue::create_table(&mut conn, keep_blacklist).await?;
 
     Ok(())
 }
