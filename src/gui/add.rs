@@ -1,7 +1,9 @@
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{
-        text::Shaping, text_input::{focus, Id}, Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput
+        text::Shaping,
+        text_input::{focus, Id},
+        Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput,
     },
     Alignment, Element, Length, Task,
 };
@@ -22,25 +24,15 @@ static INPUT_ID: Lazy<Id> = Lazy::new(Id::unique);
 pub enum Message {
     RussianChanged(String),
     NativeChanged(String),
-    DictionaryTimer {
-        version: usize,
-    },
-    ReadEntries {
-        preloading: bool,
-        word: String,
-    },
-    EntriesRead {
-        preloading: bool,
-        entries: Vec<Entry>,
-    },
+    DictionaryTimer { version: usize },
+    ReadEntries { preloading: bool, word: String },
+    EntriesRead { preloading: bool, entries: Vec<Entry> },
     LoadNext,
     Preload,
     Add,
     FromQueue(bool),
     ReadFromQueue,
-    QueueRead {
-        lemmas: Vec<String>,
-    },
+    QueueRead { lemmas: Vec<String> },
     Blacklist,
     Ignore,
     Error(String),
@@ -91,10 +83,7 @@ impl AddTab {
             }
             Message::Add => {
                 if self.native.len() > 0 && self.russian.len() > 0 {
-                    Task::perform(
-                        schedule::insert_card(Card::new(&self.native, &self.russian)),
-                        |_| Message::LoadNext,
-                    )
+                    Task::perform(schedule::insert_card(Card::new(&self.native, &self.russian)), |_| Message::LoadNext)
                 } else {
                     Task::none()
                 }
@@ -109,10 +98,7 @@ impl AddTab {
                     Task::none()
                 }
             }
-            Message::EntriesRead {
-                preloading,
-                entries,
-            } => {
+            Message::EntriesRead { preloading, entries } => {
                 if preloading {
                     let expansion = {
                         if !entries.is_empty() {
@@ -139,12 +125,10 @@ impl AddTab {
             }
             Message::ReadFromQueue => {
                 if self.from_queue {
-                    Task::future(queue::get_lemmas_queue(self.ignored_from_queue)).then(
-                        move |lemmas| match lemmas {
-                            Ok(lemmas) => Task::done(Message::QueueRead { lemmas }),
-                            Err(e) => Task::done(Message::Error(e.to_string())),
-                        },
-                    )
+                    Task::future(queue::get_lemmas_queue(self.ignored_from_queue)).then(move |lemmas| match lemmas {
+                        Ok(lemmas) => Task::done(Message::QueueRead { lemmas }),
+                        Err(e) => Task::done(Message::Error(e.to_string())),
+                    })
                 } else {
                     Task::none()
                 }
@@ -160,11 +144,7 @@ impl AddTab {
                     Task::none()
                 }
             }
-            Message::Blacklist => {
-                Task::perform(queue::blacklist_lemma(self.russian.clone()), |_| {
-                    Message::LoadNext
-                })
-            }
+            Message::Blacklist => Task::perform(queue::blacklist_lemma(self.russian.clone()), |_| Message::LoadNext),
             Message::Ignore => {
                 self.ignored_from_queue += 1;
                 Task::done(Message::LoadNext)
@@ -173,16 +153,10 @@ impl AddTab {
                 println!("{message}");
                 Task::none()
             }
-            Message::ReadEntries { preloading, word } => Task::perform(
-                dictionary::read_entries(word),
-                move |entries| match entries {
-                    Ok(entries) => Message::EntriesRead {
-                        preloading,
-                        entries,
-                    },
-                    Err(e) => Message::Error(e.to_string()),
-                },
-            ),
+            Message::ReadEntries { preloading, word } => Task::perform(dictionary::read_entries(word), move |entries| match entries {
+                Ok(entries) => Message::EntriesRead { preloading, entries },
+                Err(e) => Message::Error(e.to_string()),
+            }),
             Message::FromQueue(value) => {
                 self.from_queue = value;
                 Task::done(Message::LoadNext)
@@ -232,27 +206,11 @@ impl Tab for AddTab {
     fn content(&self) -> iced::Element<'_, Self::Message> {
         let button_row = if self.from_queue {
             Row::new()
-                .push(
-                    Button::new(Text::new("Ignore").align_x(Horizontal::Center))
-                        .width(Length::Fill)
-                        .on_press(Message::Ignore),
-                )
-                .push(
-                    Button::new(Text::new("Add").align_x(Horizontal::Center))
-                        .width(Length::Fill)
-                        .on_press(Message::Add),
-                )
-                .push(
-                    Button::new(Text::new("Blacklist").align_x(Horizontal::Center))
-                        .width(Length::Fill)
-                        .on_press(Message::Blacklist),
-                )
+                .push(Button::new(Text::new("Ignore").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Ignore))
+                .push(Button::new(Text::new("Add").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Add))
+                .push(Button::new(Text::new("Blacklist").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Blacklist))
         } else {
-            Row::new().push(
-                Button::new(Text::new("Add").align_x(Horizontal::Center))
-                    .width(Length::Fill)
-                    .on_press(Message::Add),
-            )
+            Row::new().push(Button::new(Text::new("Add").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Add))
         };
 
         let column = Column::new()
@@ -260,12 +218,7 @@ impl Tab for AddTab {
             .max_width(600)
             .padding(20)
             .spacing(16)
-            .push(
-                TextInput::new("Russian", &self.russian)
-                    .on_input(Message::RussianChanged)
-                    .padding(10)
-                    .size(32),
-            )
+            .push(TextInput::new("Russian", &self.russian).on_input(Message::RussianChanged).padding(10).size(32))
             .push(
                 TextInput::new("Native", &self.native)
                     .id(INPUT_ID.clone())
@@ -277,10 +230,7 @@ impl Tab for AddTab {
             .push(button_row)
             .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue));
 
-        let mut entry_column = Column::new()
-            .align_x(Alignment::Start)
-            .padding(20)
-            .spacing(16);
+        let mut entry_column = Column::new().align_x(Alignment::Start).padding(20).spacing(16);
 
         for entry in &self.entries {
             let etymology = match &entry.etymology {
@@ -308,15 +258,10 @@ impl Tab for AddTab {
                         format!(" ({})", pronunciation.tags.join(", "))
                     }
                 };
-                entry_column = entry_column.push(
-                    Text::new(format!("  {}{}", pronunciation.ipa, tag_string))
-                        .shaping(Shaping::Advanced),
-                )
+                entry_column = entry_column.push(Text::new(format!("  {}{}", pronunciation.ipa, tag_string)).shaping(Shaping::Advanced))
             }
 
-            entry_column = entry_column
-                .push(Text::new(format!("{}, {}", word, entry.pos)).shaping(Shaping::Advanced))
-                .push_maybe(etymology);
+            entry_column = entry_column.push(Text::new(format!("{}, {}", word, entry.pos)).shaping(Shaping::Advanced)).push_maybe(etymology);
 
             for (i, sense) in entry.senses.iter().enumerate() {
                 let tag_string = {
@@ -326,40 +271,21 @@ impl Tab for AddTab {
                         format!(" ({})", sense.tags.join(", "))
                     }
                 };
-                entry_column = entry_column.push(
-                    Text::new(format!("    {}. {}{}", i + 1, sense.sense, tag_string))
-                        .shaping(Shaping::Advanced),
-                );
+                entry_column = entry_column.push(Text::new(format!("    {}. {}{}", i + 1, sense.sense, tag_string)).shaping(Shaping::Advanced));
 
                 for example in &sense.examples {
-                    let translation = if let Some(example) = &example.english {
-                        format!(" - {}", example)
-                    } else {
-                        String::new()
-                    };
-                    entry_column = entry_column.push(
-                        Text::new(format!("        {}{}", example.text, translation))
-                            .shaping(Shaping::Advanced),
-                    );
+                    let translation = if let Some(example) = &example.english { format!(" - {}", example) } else { String::new() };
+                    entry_column = entry_column.push(Text::new(format!("        {}{}", example.text, translation)).shaping(Shaping::Advanced));
                 }
             }
         }
 
-        let entry_scrollable = if self.entries.is_empty() {
-            None
-        } else {
-            Some(Scrollable::new(entry_column).width(Length::Fill))
-        };
+        let entry_scrollable = if self.entries.is_empty() { None } else { Some(Scrollable::new(entry_column).width(Length::Fill)) };
 
-        let content: Element<'_, Message> = Container::new(
-            Row::new()
-                .align_y(Alignment::Center)
-                .push(column.width(Length::Fill))
-                .push_maybe(entry_scrollable),
-        )
-        .align_x(Horizontal::Center)
-        .align_y(Vertical::Center)
-        .into();
+        let content: Element<'_, Message> = Container::new(Row::new().align_y(Alignment::Center).push(column.width(Length::Fill)).push_maybe(entry_scrollable))
+            .align_x(Horizontal::Center)
+            .align_y(Vertical::Center)
+            .into();
 
         content.map(super::Message::Add)
     }

@@ -1,12 +1,12 @@
+use add::{AddTab, Message as AddMessage};
 use iced::{
     alignment::{Horizontal, Vertical},
     widget::{Column, Container},
     Element, Length, Task,
 };
 use iced_aw::{TabLabel, Tabs};
-use lemmatize::{Message as LemmatizeMessage, LemmatizeTab};
-use add::{Message as AddMessage, AddTab};
-use main::{Message as MainMessage, MainTab};
+use lemmatize::{LemmatizeTab, Message as LemmatizeMessage};
+use main::{MainTab, Message as MainMessage};
 
 mod add;
 mod lemmatize;
@@ -16,8 +16,7 @@ const HEADER_SIZE: u16 = 32;
 const TAB_PADDING: u16 = 16;
 
 pub fn run() -> iced::Result {
-    iced::application(App::title, App::update, App::view)
-        .run()
+    iced::application(App::title, App::update, App::view).run()
 }
 
 struct App {
@@ -70,21 +69,9 @@ impl App {
 
     fn view(&self) -> Element<'_, Message> {
         Tabs::new(Message::TabSelected)
-            .push(
-                TabId::Main,
-                self.main_tab.tab_label(),
-                self.main_tab.view(),
-            )
-            .push(
-                TabId::Add,
-                self.add_tab.tab_label(),
-                self.add_tab.view(),
-            )
-            .push(
-                TabId::Lemmatize,
-                self.lemmatize_tab.tab_label(),
-                self.lemmatize_tab.view(),
-            )
+            .push(TabId::Main, self.main_tab.tab_label(), self.main_tab.view())
+            .push(TabId::Add, self.add_tab.tab_label(), self.add_tab.view())
+            .push(TabId::Lemmatize, self.lemmatize_tab.tab_label(), self.lemmatize_tab.view())
             .set_active_tab(&self.active_tab)
             .into()
     }
@@ -98,10 +85,7 @@ trait Tab {
     fn tab_label(&self) -> TabLabel;
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let column = Column::new()
-            .spacing(20)
-            .push(self.content())
-            .align_x(iced::Alignment::Center);
+        let column = Column::new().spacing(20).push(self.content()).align_x(iced::Alignment::Center);
 
         Container::new(column)
             .width(Length::Fill)

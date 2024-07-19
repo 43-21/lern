@@ -4,20 +4,13 @@ use crate::dictionary;
 
 pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result<()> {
     conn.call(move |conn| {
-        let row: rusqlite::Result<String> = conn.query_row("SELECT name FROM sqlite_schema WHERE type='table' AND name='lemmas'", [], |row| {
-            row.get(0)
-        });
+        let row: rusqlite::Result<String> = conn.query_row("SELECT name FROM sqlite_schema WHERE type='table' AND name='lemmas'", [], |row| row.get(0));
 
         let table_exists = row.is_ok();
 
         if table_exists && keep_blacklist {
-            conn.execute(
-                "DELETE FROM lemmas WHERE blacklisted = 0",
-                ()
-            )?;
-        }
-
-        else {
+            conn.execute("DELETE FROM lemmas WHERE blacklisted = 0", ())?;
+        } else {
             conn.execute("DROP TABLE IF EXISTS lemmas", ())?;
             conn.execute(
                 "CREATE TABLE lemmas (
@@ -28,7 +21,7 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
                         first_occurence INTEGER NOT NULL
                     )",
                 (),
-            )?;        
+            )?;
         }
         Ok(())
     })
@@ -40,9 +33,10 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
 pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
-    let queue = conn.call(move |conn| {
-        let mut stmt = conn.prepare(
-            "SELECT lemma,
+    let queue = conn
+        .call(move |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT lemma,
             MIN(row_num_by_frequency, row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS smallest,
             MAX(row_num_by_frequency, row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS largest
             FROM (
@@ -69,22 +63,22 @@ pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
                     ELSE 1.5 * row_num_by_first_occurence
                 END,
                 largest
-            LIMIT ?1,200")?;
+            LIMIT ?1,200",
+            )?;
 
-        let rows = stmt.query_map([start], |row| {
-            row.get::<usize, String>(0)
-        })?;
+            let rows = stmt.query_map([start], |row| row.get::<usize, String>(0))?;
 
-        let mut queue = Vec::new();
+            let mut queue = Vec::new();
 
-        for row in rows {
-            let lemma = row?;
+            for row in rows {
+                let lemma = row?;
 
-            queue.push(lemma);
-        }
-        
-        Ok(queue)
-    }).await?;
+                queue.push(lemma);
+            }
+
+            Ok(queue)
+        })
+        .await?;
 
     Ok(queue)
 }
