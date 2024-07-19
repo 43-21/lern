@@ -82,7 +82,7 @@ impl AddTab {
                 Task::none()
             }
             Message::Add => {
-                if self.native.len() > 0 && self.russian.len() > 0 {
+                if !self.native.is_empty() && !self.russian.is_empty() {
                     Task::perform(schedule::insert_card(Card::new(&self.native, &self.russian)), |_| Message::LoadNext)
                 } else {
                     Task::none()
@@ -102,7 +102,7 @@ impl AddTab {
                 if preloading {
                     let expansion = {
                         if !entries.is_empty() {
-                            entries.get(0).unwrap().expansion.clone()
+                            entries.first().unwrap().expansion.clone()
                         } else {
                             None
                         }
@@ -135,7 +135,7 @@ impl AddTab {
             }
             Message::QueueRead { lemmas } => {
                 self.lemmas = lemmas;
-                if self.lemmas.len() == 0 {
+                if self.lemmas.is_empty() {
                     self.from_queue = false;
                 }
                 if self.next_word.is_none() {
@@ -171,8 +171,8 @@ impl AddTab {
                 }
 
                 if let Some((lemma, entries)) = &self.next_word {
-                    self.russian = lemma.to_owned();
-                    self.entries = entries.to_owned();
+                    lemma.clone_into(&mut self.russian);
+                    entries.clone_into(&mut self.entries);
                     self.next_word = None;
                 }
 
@@ -233,10 +233,7 @@ impl Tab for AddTab {
         let mut entry_column = Column::new().align_x(Alignment::Start).padding(20).spacing(16);
 
         for entry in &self.entries {
-            let etymology = match &entry.etymology {
-                Some(etymology) => Some(Text::new(etymology).shaping(Shaping::Advanced)),
-                _ => None,
-            };
+            let etymology = entry.etymology.as_ref().map(|etymology| Text::new(etymology).shaping(Shaping::Advanced));
 
             let word = {
                 if let Some(expansion) = &entry.expansion {

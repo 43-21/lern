@@ -64,18 +64,12 @@ impl MainTab {
             }
             Message::SetWiktionaryFile => Task::perform(AsyncFileDialog::new().set_title("Wiktionary").add_filter("JSON Lines", &["jsonl"]).pick_file(), |file_handle| {
                 Message::WiktionaryFileSet {
-                    path: match file_handle {
-                        Some(file_handle) => Some(file_handle.into()),
-                        None => None,
-                    },
+                    path: file_handle.map(|file_handle| file_handle.into()),
                 }
             }),
             Message::SetFrequencyFile => Task::perform(AsyncFileDialog::new().set_title("Frequency").add_filter("text", &["txt"]).pick_file(), |file_handle| {
                 Message::FrequencyFileSet {
-                    path: match file_handle {
-                        Some(file_handle) => Some(file_handle.into()),
-                        None => None,
-                    },
+                    path: file_handle.map(|file_handle| file_handle.into()),
                 }
             }),
             Message::WiktionaryFileSet { path } => {
@@ -130,10 +124,7 @@ impl MainTab {
                     .set_file_name("RussianDeck")
                     .save_file(),
                 |file_handle| Message::Export {
-                    path: match file_handle {
-                        Some(file_handle) => Some(file_handle.into()),
-                        None => None,
-                    },
+                    path: file_handle.map(|file_handle| file_handle.into()),
                 },
             ),
             Message::Export { path } => match path {

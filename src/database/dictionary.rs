@@ -195,27 +195,21 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
     let lines = read_lines(path_to_wiktionary).unwrap();
 
-    'iteration: for line in lines.flatten() {
+    'iteration: for line in lines.map_while(std::io::Result::ok) {
         let json: serde_json::Value = serde_json::from_str(&line).unwrap();
 
         let word = json.get("word").unwrap().as_str().unwrap();
         let pos = json.get("pos").unwrap().as_str().unwrap();
-        let etymology = {
-            if let Some(etymology) = json.get("etymology_text") {
-                Some(etymology.as_str().unwrap())
-            } else {
-                None
-            }
-        };
+        let etymology = json.get("etymology_text").map(|etymology| etymology.as_str().unwrap());
 
-        if !vec!["noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron"].contains(&pos) {
+        if !["noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron"].contains(&pos) {
             continue 'iteration;
         }
 
         let head_templates = json.get("head_templates");
         let expansion = {
             if let Some(head_templates) = head_templates {
-                head_templates.as_array().unwrap().get(0).unwrap().get("expansion").unwrap().as_str()
+                head_templates.as_array().unwrap().first().unwrap().get("expansion").unwrap().as_str()
             } else {
                 None
             }
@@ -240,7 +234,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
             senses.push(sense);
         }
 
-        if senses.len() == 0 {
+        if senses.is_empty() {
             continue 'iteration;
         }
 
@@ -258,13 +252,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
         let senses = json.get("senses").unwrap().as_array().unwrap();
         for (i, sense) in senses.iter().enumerate() {
-            let gloss = {
-                if let Some(glosses) = sense.get("glosses") {
-                    Some(glosses.as_array().unwrap()[0].as_str().unwrap())
-                } else {
-                    None
-                }
-            };
+            let gloss = sense.get("glosses").map(|glosses| glosses.as_array().unwrap()[0].as_str().unwrap());
 
             if let Some(gloss) = gloss {
                 sense_stmt_gloss.execute(params![word_id, gloss, i])?;
@@ -298,13 +286,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
             for example in examples {
                 let text = example.get("text").unwrap().as_str().unwrap();
-                let english = {
-                    if let Some(english) = example.get("english") {
-                        Some(english.as_str().unwrap())
-                    } else {
-                        None
-                    }
-                };
+                let english = example.get("english").map(|english| english.as_str().unwrap());
 
                 if let Some(english) = english {
                     example_stmt_english.execute(params![sense_id, text, english])?;
