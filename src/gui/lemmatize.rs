@@ -51,29 +51,18 @@ impl LemmatizeTab {
                     Err(e) => Task::done(Message::Error(e.to_string())),
                 })
             }
-            Message::FromFile => {
-                Task::perform(
-                    AsyncFileDialog::new()
-                    .set_title("From file")
-                    .add_filter("text", &["txt", "srt"])
-                    .pick_file(),
-                    |file_handle| {
-                        Message::FileSet {
-                            path: file_handle.map(|file_handle| file_handle.into()),
-                        }
-                    }
-                )
-            }
+            Message::FromFile => Task::perform(AsyncFileDialog::new().set_title("From file").add_filter("text", &["txt", "srt"]).pick_file(), |file_handle| {
+                Message::FileSet {
+                    path: file_handle.map(|file_handle| file_handle.into()),
+                }
+            }),
             Message::FileSet { path } => {
                 if let Some(path) = path {
-                    Task::future(lemmatize_from_file(path)).then(|result| {
-                        match result {
-                            Ok(()) => Task::none(),
-                            Err(e) => Task::done(Message::Error(e.to_string()))
-                        }
+                    Task::future(lemmatize_from_file(path)).then(|result| match result {
+                        Ok(()) => Task::none(),
+                        Err(e) => Task::done(Message::Error(e.to_string())),
                     })
-                }
-                else {
+                } else {
                     Task::none()
                 }
             }
