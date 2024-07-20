@@ -1,11 +1,14 @@
+use std::path::PathBuf;
+
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{text_editor, Button, Container, Row, Text},
+    widget::{text_editor, Button, Column, Container, Row, Text},
     Alignment, Element, Length, Task,
 };
 use iced_aw::TabLabel;
+use rfd::AsyncFileDialog;
 
-use crate::dictionary::lemmatize;
+use crate::dictionary::{lemmatize, lemmatize_from_file};
 
 use super::Tab;
 
@@ -18,6 +21,8 @@ pub struct LemmatizeTab {
 pub enum Message {
     ActionPerformed(text_editor::Action),
     Lemmatize,
+    FromFile,
+    FileSet { path: Option<PathBuf> },
     Error(String),
 }
 
@@ -46,6 +51,32 @@ impl LemmatizeTab {
                     Err(e) => Task::done(Message::Error(e.to_string())),
                 })
             }
+            Message::FromFile => {
+                Task::perform(
+                    AsyncFileDialog::new()
+                    .set_title("From file")
+                    .add_filter("text", &["txt", "srt"])
+                    .pick_file(),
+                    |file_handle| {
+                        Message::FileSet {
+                            path: file_handle.map(|file_handle| file_handle.into()),
+                        }
+                    }
+                )
+            }
+            Message::FileSet { path } => {
+                if let Some(path) = path {
+                    Task::future(lemmatize_from_file(path)).then(|result| {
+                        match result {
+                            Ok(()) => Task::none(),
+                            Err(e) => Task::done(Message::Error(e.to_string()))
+                        }
+                    })
+                }
+                else {
+                    Task::none()
+                }
+            }
             Message::Error(e) => {
                 println!("{e}");
                 Task::none()
@@ -71,7 +102,14 @@ impl Tab for LemmatizeTab {
                 .align_y(Alignment::Center)
                 .padding(20)
                 .spacing(16)
-                .push(text_editor(&self.content).height(Length::Fill).on_action(Message::ActionPerformed))
+                .push(
+                    Column::new()
+                        .align_x(Alignment::Center)
+                        .padding(20)
+                        .spacing(8)
+                        .push(text_editor(&self.content).height(Length::Fill).on_action(Message::ActionPerformed))
+                        .push(Button::new(Text::new("From file")).on_press(Message::FromFile)),
+                )
                 .push(Button::new(Text::new("Lemmatize")).on_press(Message::Lemmatize)),
         )
         .align_x(Horizontal::Center)
