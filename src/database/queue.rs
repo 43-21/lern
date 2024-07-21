@@ -11,27 +11,26 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
         if table_exists && keep_blacklist {
             conn.execute("DELETE FROM lemmas WHERE blacklisted = 0", ())?;
         } else {
-            conn.execute("DROP TABLE IF EXISTS lemmas", ())?;
-            conn.execute(
-                "CREATE TABLE lemmas (
-                        lemma TEXT PRIMARY KEY,
-                        frequency INTEGER NOT NULL,
-                        general_frequency INTEGER,
-                        blacklisted INTEGER NOT NULL CHECK (blacklisted IN (0, 1)),
-                        first_occurence INTEGER NOT NULL
-                    )",
-                (),
+            conn.execute_batch(
+                "DROP TABLE IF EXISTS sentences;
+                CREATE TABLE sentences (
+                    lemma TEXT NOT NULL,
+                    sentence TEXT NOT NULL,
+                    FOREIGN KEY(lemma) REFERENCES lemmas(lemma) ON DELETE CASCADE
+                );"
+            )?;
+    
+            conn.execute_batch(
+                "DROP TABLE IF EXISTS lemmas;
+                CREATE TABLE lemmas (
+                    lemma TEXT PRIMARY KEY,
+                    frequency INTEGER NOT NULL,
+                    general_frequency INTEGER,
+                    blacklisted INTEGER NOT NULL CHECK (blacklisted IN (0, 1)),
+                    first_occurence INTEGER NOT NULL
+                );",
             )?;
         }
-
-        conn.execute_batch(
-            "DROP TABLE IF EXISTS sentences;
-            CREATE TABLE sentences (
-                lemma TEXT NOT NULL,
-                sentence TEXT NOT NULL,
-                FOREIGN KEY(lemma) REFERENCES lemmas(lemma)
-            );"
-        )?;
 
         Ok(())
     })
