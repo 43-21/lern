@@ -19,9 +19,9 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
                     sentence TEXT NOT NULL,
                     FOREIGN KEY(lemma) REFERENCES lemmas(lemma) ON DELETE CASCADE
                 );
-                CREATE INDEX sentence_index ON sentences(lemma)"
+                CREATE INDEX sentence_index ON sentences(lemma)",
             )?;
-    
+
             conn.execute_batch(
                 "DROP TABLE IF EXISTS lemmas;
                 CREATE TABLE lemmas (
@@ -116,13 +116,9 @@ pub async fn get_sentences(lemma: String) -> Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
     conn.call(move |conn| {
-        let mut stmt = conn.prepare(
-            "SELECT sentence FROM sentences WHERE lemma = ?1"
-        )?;
+        let mut stmt = conn.prepare("SELECT sentence FROM sentences WHERE lemma = ?1")?;
 
-        let rows = stmt.query_map([lemma], |row| {
-            row.get(0)
-        })?;
+        let rows = stmt.query_map([lemma], |row| row.get(0))?;
 
         let mut sentences = Vec::new();
 
@@ -131,5 +127,6 @@ pub async fn get_sentences(lemma: String) -> Result<Vec<String>> {
         }
 
         Ok(sentences)
-    }).await
+    })
+    .await
 }

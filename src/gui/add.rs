@@ -296,11 +296,7 @@ impl Tab for AddTab {
             sentence_text += format!("{}\n\n", sentence).as_str();
         }
 
-        entry_column = entry_column.push_maybe(if self.sentences.is_empty() {
-            None
-        } else {
-            Some(Text::new(sentence_text))
-        });
+        entry_column = entry_column.push_maybe(if self.sentences.is_empty() { None } else { Some(Text::new(sentence_text)) });
 
         let entry_scrollable = if self.entries.is_empty() { None } else { Some(Scrollable::new(entry_column).width(Length::Fill)) };
 
