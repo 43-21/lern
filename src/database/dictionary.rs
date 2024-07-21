@@ -546,7 +546,7 @@ pub async fn lemmatize_sentences(sentences: Vec<(String, Vec<(String, usize)>)>)
 
         let mut insert_lemmas_stmt = ta.prepare(
             "INSERT INTO lemmas
-                SELECT w.word, frequency.frequency as general_frequency, 0 as blacklisted, ?1 as first_occurence
+                SELECT w.word as lemma, 1 as frequency, frequency.frequency as general_frequency, 0 as blacklisted, ?1 as first_occurence
                 FROM words w
                 JOIN forms ON forms.word_id = w.id
                 JOIN frequency ON w.id = frequency.word_id
