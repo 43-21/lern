@@ -27,6 +27,8 @@ pub enum Message {
     DictionaryTimer { version: usize },
     ReadEntries { preloading: bool, word: String },
     EntriesRead { preloading: bool, entries: Vec<Entry> },
+    ReadSentences { preloading: bool, word: String },
+    SentencesRead { preloading: bool, sentences: Vec<String> },
     LoadNext,
     Preload,
     Add,
@@ -43,10 +45,12 @@ pub struct AddTab {
     native: String,
     version: usize,
     entries: Vec<Entry>,
+    sentences: Vec<String>,
     lemmas: Vec<String>,
     from_queue: bool,
     ignored_from_queue: usize,
     next_word: Option<(String, Vec<Entry>)>,
+    next_sentences: Option<Vec<String>>,
 }
 
 impl AddTab {
@@ -56,10 +60,12 @@ impl AddTab {
             native: String::new(),
             version: 0,
             entries: Vec::new(),
+            sentences: Vec::new(),
             lemmas: Vec::new(),
             from_queue: false,
             ignored_from_queue: 0,
             next_word: None,
+            next_sentences: None,
         }
     }
 
@@ -90,10 +96,16 @@ impl AddTab {
             }
             Message::DictionaryTimer { version } => {
                 if version == self.version {
-                    Task::done(Message::ReadEntries {
-                        preloading: false,
-                        word: self.russian.clone(),
-                    })
+                    Task::batch(vec![
+                        Task::done(Message::ReadEntries {
+                            preloading: false,
+                            word: self.russian.clone(),
+                        }),
+                        Task::done(Message::ReadSentences {
+                            preloading: false,
+                            word: self.russian.clone(),
+                        }),
+                    ])
                 } else {
                     Task::none()
                 }
@@ -157,6 +169,19 @@ impl AddTab {
                 Ok(entries) => Message::EntriesRead { preloading, entries },
                 Err(e) => Message::Error(e.to_string()),
             }),
+            Message::ReadSentences { preloading, word } => Task::perform(queue::get_sentences(word), move |sentences| match sentences {
+                Ok(sentences) => Message::SentencesRead { preloading, sentences },
+                Err(e) => Message::Error(e.to_string()),
+            }),
+            Message::SentencesRead { preloading, sentences } => {
+                if preloading {
+                    self.next_sentences = Some(sentences);
+                } else {
+                    self.sentences = sentences;
+                }
+
+                Task::none()
+            }
             Message::FromQueue(value) => {
                 self.from_queue = value;
                 Task::done(Message::LoadNext)
@@ -176,16 +201,22 @@ impl AddTab {
                     self.next_word = None;
                 }
 
+                if let Some(sentences) = &self.next_sentences {
+                    sentences.clone_into(&mut self.sentences);
+                    self.next_sentences = None;
+                }
+
                 Task::batch([Task::done(Message::Preload), focus(INPUT_ID.clone())])
             }
             Message::Preload => {
                 if self.lemmas.is_empty() {
                     Task::done(Message::ReadFromQueue)
                 } else {
-                    Task::done(Message::ReadEntries {
-                        preloading: true,
-                        word: self.lemmas.remove(0),
-                    })
+                    let word = self.lemmas.remove(0);
+                    Task::batch(vec![
+                        Task::done(Message::ReadEntries { preloading: true, word: word.clone() }),
+                        Task::done(Message::ReadSentences { preloading: true, word: word.clone() }),
+                    ])
                 }
             }
         }
@@ -212,23 +243,6 @@ impl Tab for AddTab {
         } else {
             Row::new().push(Button::new(Text::new("Add").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Add))
         };
-
-        let column = Column::new()
-            .align_x(Alignment::Center)
-            .max_width(600)
-            .padding(20)
-            .spacing(16)
-            .push(TextInput::new("Russian", &self.russian).on_input(Message::RussianChanged).padding(10).size(32))
-            .push(
-                TextInput::new("Native", &self.native)
-                    .id(INPUT_ID.clone())
-                    .on_input(Message::NativeChanged)
-                    .padding(10)
-                    .size(32)
-                    .on_submit(Message::Add),
-            )
-            .push(button_row)
-            .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue));
 
         let mut entry_column = Column::new().align_x(Alignment::Start).padding(20).spacing(16);
 
@@ -277,7 +291,35 @@ impl Tab for AddTab {
             }
         }
 
+        let mut sentence_text = String::new();
+        for sentence in &self.sentences {
+            sentence_text += format!("{}\n\n", sentence).as_str();
+        }
+
+        entry_column = entry_column.push_maybe(if self.sentences.is_empty() {
+            None
+        } else {
+            Some(Text::new(sentence_text))
+        });
+
         let entry_scrollable = if self.entries.is_empty() { None } else { Some(Scrollable::new(entry_column).width(Length::Fill)) };
+
+        let column = Column::new()
+            .align_x(Alignment::Center)
+            .max_width(600)
+            .padding(20)
+            .spacing(16)
+            .push(TextInput::new("Russian", &self.russian).on_input(Message::RussianChanged).padding(10).size(32))
+            .push(
+                TextInput::new("Native", &self.native)
+                    .id(INPUT_ID.clone())
+                    .on_input(Message::NativeChanged)
+                    .padding(10)
+                    .size(32)
+                    .on_submit(Message::Add),
+            )
+            .push(button_row)
+            .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue));
 
         let content: Element<'_, Message> = Container::new(Row::new().align_y(Alignment::Center).push(column.width(Length::Fill)).push_maybe(entry_scrollable))
             .align_x(Horizontal::Center)
