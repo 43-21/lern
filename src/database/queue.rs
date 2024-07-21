@@ -23,6 +23,16 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
                 (),
             )?;
         }
+
+        conn.execute_batch(
+            "DROP TABLE IF EXISTS sentences;
+            CREATE TABLE sentences (
+                lemma TEXT NOT NULL,
+                sentence TEXT NOT NULL,
+                FOREIGN KEY(lemma) REFERENCES lemmas(lemma)
+            );"
+        )?;
+
         Ok(())
     })
     .await?;

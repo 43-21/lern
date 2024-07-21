@@ -6,6 +6,29 @@ use tokio_rusqlite::Result;
 
 use crate::database::dictionary;
 
+async fn lemmatize_sentences(text: String) -> Result<()> {
+    let regex = Regex::new(r"(?<=[.!?…])\s+|(?<=[.!?…])\n+|\r+|\n+").unwrap();
+    let sentences: Vec<String> = regex.split(&text).map(|s| s.to_owned()).collect();
+
+    let mut sentences_with_forms = Vec::new();
+
+    let mut current_word_index = 0;
+    for sentence in sentences {
+        let regex = Regex::new(r"[^А-яёЁ]").unwrap();
+        let forms: Vec<String> = regex.replace_all(&text, " ").split_whitespace().map(|s| s.to_lowercase()).collect();
+
+        let mut tuples = Vec::new();
+        for (i, form) in forms.into_iter().enumerate() {
+            tuples.push((form, current_word_index + i))
+        }
+        current_word_index += tuples.len();
+
+        sentences_with_forms.push((sentence, tuples));
+    }
+
+    dictionary::lemmatize_sentences(sentences_with_forms).await
+}
+
 pub async fn lemmatize(text: String) -> Result<()> {
     let regex = Regex::new(r"[^А-яёЁ]").unwrap();
     let forms: Vec<String> = regex.replace_all(&text, " ").split_whitespace().map(|s| s.to_lowercase()).collect();
@@ -24,16 +47,7 @@ pub async fn lemmatize_from_file(path: PathBuf) -> Result<()> {
     let mut text = String::new();
     file.read_to_string(&mut text).await.unwrap();
 
-    let regex = Regex::new(r"[^А-яёЁ]").unwrap();
-    let forms: Vec<String> = regex.replace_all(&text, " ").split_whitespace().map(|s| s.to_lowercase()).collect();
-
-    let mut hash_map = HashMap::new();
-    for (i, form) in forms.into_iter().enumerate() {
-        let entry = hash_map.entry(form).or_insert((0, i));
-        entry.0 += 1;
-    }
-
-    dictionary::lemmatize(hash_map).await
+    lemmatize(text).await
 }
 
 pub fn remove_accents(mut word: String) -> String {

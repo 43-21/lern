@@ -537,6 +537,57 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
+pub async fn lemmatize_sentences(sentences: Vec<(String, Vec<(String, usize)>)>) -> Result<()> {
+    let conn = Connection::open("./db/database.db").await?;
+    conn.call(|conn| {
+        let ta = conn.transaction()?;
+
+        let max_first_occurence: usize = ta.query_row("SELECT MAX(first_occurence) FROM lemmas", [], |row| row.get(0)).unwrap_or(0);
+
+        let mut insert_lemmas_stmt = ta.prepare(
+            "INSERT INTO lemmas
+                SELECT w.word, frequency.frequency as general_frequency, 0 as blacklisted, ?1 as first_occurence
+                FROM words w
+                JOIN forms ON forms.word_id = w.id
+                JOIN frequency ON w.id = frequency.word_id
+                WHERE normalized_form = ?2
+                GROUP BY w.id
+            ON CONFLICT(lemma) DO UPDATE SET frequency = frequency + 1",
+        )?;
+
+        let mut insert_sentence_stmt = ta.prepare(
+            "INSERT INTO sentences
+            SELECT lemma, ?1
+            FROM (
+                SELECT word as lemma
+                FROM words
+                JOIN forms ON forms.word_id = words.id
+                JOIN frequency ON words.id = frequency.word_id
+                WHERE normalized_form = ?2
+                GROUP BY words.id
+            ) AS lemmas WHERE (SELECT COUNT(*) FROM SENTENCES WHERE lemma = lemmas.lemma) < 5"
+        )?;
+
+        let start = std::time::Instant::now();
+        for (sentence, forms) in sentences {
+            for (form, position) in forms {
+                insert_lemmas_stmt.execute(params![max_first_occurence + position, form])?;
+                insert_sentence_stmt.execute(params![sentence, form])?;
+            }
+        }
+
+        drop(insert_lemmas_stmt);
+        drop(insert_sentence_stmt);
+
+        ta.commit()?;
+
+        println!("elapsed: {:?}", start.elapsed());
+
+        Ok(())
+    })
+    .await
+}
+
 pub async fn lemmatize(forms: HashMap<String, (usize, usize)>) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
     conn.call(|conn| {
