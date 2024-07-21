@@ -570,9 +570,12 @@ pub async fn lemmatize_sentences(sentences: Vec<(String, Vec<(String, usize)>)>)
 
         let start = std::time::Instant::now();
         for (sentence, forms) in sentences {
+            let size = forms.len();
             for (form, position) in forms {
                 insert_lemmas_stmt.execute(params![max_first_occurence + position, form])?;
-                insert_sentence_stmt.execute(params![sentence, form])?;
+                if size >= 5 && size < 25 {
+                    insert_sentence_stmt.execute(params![sentence, form])?;
+                }
             }
         }
 
