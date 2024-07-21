@@ -109,3 +109,25 @@ pub async fn blacklist_lemma(lemma: String) -> Result<()> {
     })
     .await
 }
+
+pub async fn get_sentences(lemma: String) -> Result<Vec<String>> {
+    let conn = Connection::open("./db/database.db").await?;
+
+    conn.call(move |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT sentence FROM sentences WHERE lemma = ?1"
+        )?;
+
+        let rows = stmt.query_map([lemma], |row| {
+            row.get(0)
+        })?;
+
+        let mut sentences = Vec::new();
+
+        for sentence in rows {
+            sentences.push(sentence?);
+        }
+
+        Ok(sentences)
+    }).await
+}
