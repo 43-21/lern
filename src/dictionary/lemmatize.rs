@@ -29,7 +29,10 @@ async fn lemmatize_sentences(text: String) -> Result<()> {
     dictionary::lemmatize_sentences(sentences_with_forms).await
 }
 
-pub async fn lemmatize(text: String) -> Result<()> {
+pub async fn lemmatize(text: String, add_sentences: bool) -> Result<()> {
+    if add_sentences {
+        return lemmatize_sentences(text).await;
+    }
     let regex = Regex::new(r"[^А-яёЁ]").unwrap();
     let forms: Vec<String> = regex.replace_all(&text, " ").split_whitespace().map(|s| s.to_lowercase()).collect();
 
@@ -42,12 +45,12 @@ pub async fn lemmatize(text: String) -> Result<()> {
     dictionary::lemmatize(hash_map).await
 }
 
-pub async fn lemmatize_from_file(path: PathBuf) -> Result<()> {
+pub async fn lemmatize_from_file(path: PathBuf, add_sentences: bool) -> Result<()> {
     let mut file = File::open(path).await.unwrap();
     let mut text = String::new();
     file.read_to_string(&mut text).await.unwrap();
 
-    lemmatize(text).await
+    lemmatize(text, add_sentences).await
 }
 
 pub fn remove_accents(mut word: String) -> String {

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use iced::{
     alignment::{Horizontal, Vertical},
-    widget::{text_editor, Button, Column, Container, Row, Text},
+    widget::{text_editor, Button, Checkbox, Column, Container, Row, Text},
     Alignment, Element, Length, Task,
 };
 use iced_aw::TabLabel;
@@ -15,6 +15,7 @@ use super::Tab;
 pub struct LemmatizeTab {
     content: text_editor::Content,
     is_dirty: bool,
+    add_sentences: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,7 @@ pub enum Message {
     Lemmatize,
     FromFile,
     FileSet { path: Option<PathBuf> },
+    AddSentences(bool),
     Error(String),
 }
 
@@ -31,6 +33,7 @@ impl LemmatizeTab {
         LemmatizeTab {
             content: text_editor::Content::new(),
             is_dirty: false,
+            add_sentences: true,
         }
     }
 
@@ -46,7 +49,7 @@ impl LemmatizeTab {
                 self.content = text_editor::Content::new();
                 self.is_dirty = false;
 
-                Task::future(lemmatize(text)).then(|result| match result {
+                Task::future(lemmatize(text, self.add_sentences)).then(|result| match result {
                     Ok(()) => Task::none(),
                     Err(e) => Task::done(Message::Error(e.to_string())),
                 })
@@ -58,13 +61,17 @@ impl LemmatizeTab {
             }),
             Message::FileSet { path } => {
                 if let Some(path) = path {
-                    Task::future(lemmatize_from_file(path)).then(|result| match result {
+                    Task::future(lemmatize_from_file(path, self.add_sentences)).then(|result| match result {
                         Ok(()) => Task::none(),
                         Err(e) => Task::done(Message::Error(e.to_string())),
                     })
                 } else {
                     Task::none()
                 }
+            }
+            Message::AddSentences(value) => {
+                self.add_sentences = value;
+                Task::none()
             }
             Message::Error(e) => {
                 println!("{e}");
@@ -96,6 +103,7 @@ impl Tab for LemmatizeTab {
                         .align_x(Alignment::Center)
                         .padding(20)
                         .spacing(8)
+                        .push(Checkbox::new("Add sentences", self.add_sentences).on_toggle(Message::AddSentences))
                         .push(text_editor(&self.content).height(Length::Fill).on_action(Message::ActionPerformed))
                         .push(Button::new(Text::new("From file")).on_press(Message::FromFile)),
                 )
