@@ -7,8 +7,8 @@ use tokio_rusqlite::Result;
 use crate::database::dictionary;
 
 async fn lemmatize_sentences(text: String) -> Result<()> {
-    let regex = Regex::new(r"[^\s»—][^\r\n\t\v\f.?!…]*[.?!…]+»*").unwrap();
-    let sentences: Vec<String> = regex.find_iter(&text).map(|m| m.as_str().to_owned()).collect();
+    let regex = Regex::new(r"[^\s»—][^\r\n\t\v\f.?!…]*[.?!…\n\r\t\v\f]+»*").unwrap();
+    let sentences: Vec<String> = regex.find_iter(&text).map(|m| m.as_str().trim().to_owned()).collect();
 
     let mut sentences_with_forms = Vec::new();
 
