@@ -41,13 +41,14 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
     Ok(())
 }
 
-pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
+pub async fn get_lemmas_queue(start: usize, by_frequency: bool, by_general_frequency: bool, by_first_occurence: bool) -> Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
     let queue = conn
         .call(move |conn| {
-            let mut stmt = conn.prepare(
-                "SELECT lemma,
+            let mut stmt = if by_frequency && by_general_frequency && by_first_occurence {
+                conn.prepare(
+                    "SELECT lemma,
             MIN(row_num_by_frequency, row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS smallest,
             MAX(row_num_by_frequency, row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS largest
             FROM (
@@ -75,7 +76,102 @@ pub async fn get_lemmas_queue(start: usize) -> Result<Vec<String>> {
                 END,
                 largest
             LIMIT ?1,200",
-            )?;
+                )?
+            } else if by_frequency && by_general_frequency {
+                conn.prepare(
+                    "SELECT lemma,
+            MIN(row_num_by_frequency, row_num_by_general_frequency) AS smallest,
+            MAX(row_num_by_frequency, row_num_by_general_frequency) AS largest
+            FROM (
+                SELECT lemma,
+                ROW_NUMBER() OVER (
+                    ORDER BY frequency DESC
+                ) AS row_num_by_frequency,
+                ROW_NUMBER() OVER (
+                    ORDER BY general_frequency
+                ) AS row_num_by_general_frequency
+                FROM lemmas
+                WHERE blacklisted = 0
+            ) temp_table
+            ORDER BY
+                smallest,
+                largest
+            LIMIT ?1,200",
+                )?
+            } else if by_frequency && by_first_occurence {
+                conn.prepare(
+                    "SELECT lemma,
+            MIN(row_num_by_frequency, 1.5 * row_num_by_first_occurence) AS smallest,
+            MAX(row_num_by_frequency, 1.5 * row_num_by_first_occurence) AS largest
+            FROM (
+                SELECT lemma,
+                ROW_NUMBER() OVER (
+                    ORDER BY frequency DESC
+                ) AS row_num_by_frequency,
+                ROW_NUMBER() OVER (
+                    ORDER BY first_occurence
+                ) AS row_num_by_first_occurence
+                FROM lemmas
+                WHERE blacklisted = 0
+            ) temp_table
+            ORDER BY
+                smallest,
+                largest
+            LIMIT ?1,200",
+                )?
+            } else if by_general_frequency && by_first_occurence {
+                conn.prepare(
+                    "SELECT lemma,
+            MIN(row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS smallest,
+            MAX(row_num_by_general_frequency, 1.5 * row_num_by_first_occurence) AS largest
+            FROM (
+                SELECT lemma,
+                ROW_NUMBER() OVER (
+                    ORDER BY general_frequency
+                ) AS row_num_by_general_frequency,
+                ROW_NUMBER() OVER (
+                    ORDER BY first_occurence
+                ) AS row_num_by_first_occurence
+                FROM lemmas
+                WHERE blacklisted = 0
+            ) temp_table
+            ORDER BY
+                smallest,
+                largest
+            LIMIT ?1,200",
+                )?
+            } else if by_frequency {
+                conn.prepare(
+                    "SELECT lemma
+                FROM lemmas
+                WHERE blacklisted = 0
+            ORDER BY frequency
+            LIMIT ?1,200",
+                )?
+            } else if by_general_frequency {
+                conn.prepare(
+                    "SELECT lemma
+                FROM lemmas
+                WHERE blacklisted = 0
+            ORDER BY general_frequency
+            LIMIT ?1,200",
+                )?
+            } else if by_first_occurence {
+                conn.prepare(
+                    "SELECT lemma
+                FROM lemmas
+                WHERE blacklisted = 0
+            ORDER BY first_occurence
+            LIMIT ?1,200",
+                )?
+            } else {
+                conn.prepare(
+                    "SELECT lemma
+                FROM lemmas
+                WHERE blacklisted = 0
+                LIMIT ?1,200",
+                )?
+            };
 
             let rows = stmt.query_map([start], |row| row.get::<usize, String>(0))?;
 

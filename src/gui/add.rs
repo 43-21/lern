@@ -145,7 +145,7 @@ impl AddTab {
             }
             Message::ReadFromQueue => {
                 if self.from_queue {
-                    Task::future(queue::get_lemmas_queue(self.ignored_from_queue)).then(move |lemmas| match lemmas {
+                    Task::future(queue::get_lemmas_queue(self.ignored_from_queue, self.order_frequency, self.order_general_frequency, self.order_first_occurence)).then(move |lemmas| match lemmas {
                         Ok(lemmas) => Task::done(Message::QueueRead { lemmas }),
                         Err(e) => Task::done(Message::Error(e.to_string())),
                     })
