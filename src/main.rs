@@ -1,9 +1,9 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 #![allow(dead_code)]
 
 mod database;
-mod fsrs;
 mod dictionary;
+mod fsrs;
 mod gui;
 
 fn main() {

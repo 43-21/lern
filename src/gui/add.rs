@@ -197,7 +197,7 @@ impl AddTab {
                         self.order_frequency,
                         self.order_general_frequency,
                         self.order_first_occurence,
-                        self.word_classes.clone()
+                        self.word_classes.clone(),
                     ))
                     .then(move |lemmas| match lemmas {
                         Ok(lemmas) => Task::done(Message::QueueRead { lemmas }),
@@ -432,38 +432,66 @@ impl Tab for AddTab {
         let word_class_menu = menu_bar!((
             Button::new(Text::new("Include...")).on_press(Message::ClassButtonPressed),
             {
-                Menu::new(menu_items!(
-                    (Checkbox::new("nouns", self.word_classes.contains(&WordClass::Noun))
-                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Noun))
-                        .width(Length::Fill))
-                    (Checkbox::new("verbs", self.word_classes.contains(&WordClass::Verb))
+                Menu::new(menu_items!((Checkbox::new(
+                    "nouns",
+                    self.word_classes.contains(&WordClass::Noun)
+                )
+                .on_toggle(|value| Message::ClassToggled(value, WordClass::Noun))
+                .width(Length::Fill))(
+                    Checkbox::new("verbs", self.word_classes.contains(&WordClass::Verb))
                         .on_toggle(|value| Message::ClassToggled(value, WordClass::Verb))
-                        .width(Length::Fill))
-                    (Checkbox::new("adjectives", self.word_classes.contains(&WordClass::Adjective))
-                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Adjective))
-                        .width(Length::Fill))
-                    (Checkbox::new("determiners", self.word_classes.contains(&WordClass::Determiner))
-                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Determiner))
-                        .width(Length::Fill))
-                    (Checkbox::new("adverbs", self.word_classes.contains(&WordClass::Adverb))
+                        .width(Length::Fill)
+                )(
+                    Checkbox::new(
+                        "adjectives",
+                        self.word_classes.contains(&WordClass::Adjective)
+                    )
+                    .on_toggle(|value| Message::ClassToggled(value, WordClass::Adjective))
+                    .width(Length::Fill)
+                )(
+                    Checkbox::new(
+                        "determiners",
+                        self.word_classes.contains(&WordClass::Determiner)
+                    )
+                    .on_toggle(|value| Message::ClassToggled(value, WordClass::Determiner))
+                    .width(Length::Fill)
+                )(
+                    Checkbox::new("adverbs", self.word_classes.contains(&WordClass::Adverb))
                         .on_toggle(|value| Message::ClassToggled(value, WordClass::Adverb))
-                        .width(Length::Fill))
-                    (Checkbox::new("interjections", self.word_classes.contains(&WordClass::Interjection))
-                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Interjection))
-                        .width(Length::Fill))
-                    (Checkbox::new("particles", self.word_classes.contains(&WordClass::Particle))
-                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Particle))
-                        .width(Length::Fill))
-                    (Checkbox::new("conjunctions", self.word_classes.contains(&WordClass::Conjunction))
-                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Conjunction))
-                        .width(Length::Fill))
-                    (Checkbox::new("prepositions", self.word_classes.contains(&WordClass::Preposition))
-                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Preposition))
-                        .width(Length::Fill))
-                    (Checkbox::new("pronouns", self.word_classes.contains(&WordClass::Pronoun))
+                        .width(Length::Fill)
+                )(
+                    Checkbox::new(
+                        "interjections",
+                        self.word_classes.contains(&WordClass::Interjection)
+                    )
+                    .on_toggle(|value| Message::ClassToggled(value, WordClass::Interjection))
+                    .width(Length::Fill)
+                )(
+                    Checkbox::new(
+                        "particles",
+                        self.word_classes.contains(&WordClass::Particle)
+                    )
+                    .on_toggle(|value| Message::ClassToggled(value, WordClass::Particle))
+                    .width(Length::Fill)
+                )(
+                    Checkbox::new(
+                        "conjunctions",
+                        self.word_classes.contains(&WordClass::Conjunction)
+                    )
+                    .on_toggle(|value| Message::ClassToggled(value, WordClass::Conjunction))
+                    .width(Length::Fill)
+                )(
+                    Checkbox::new(
+                        "prepositions",
+                        self.word_classes.contains(&WordClass::Preposition)
+                    )
+                    .on_toggle(|value| Message::ClassToggled(value, WordClass::Preposition))
+                    .width(Length::Fill)
+                )(
+                    Checkbox::new("pronouns", self.word_classes.contains(&WordClass::Pronoun))
                         .on_toggle(|value| Message::ClassToggled(value, WordClass::Pronoun))
-                        .width(Length::Fill))
-                ))
+                        .width(Length::Fill)
+                )))
                 .max_width(180.0)
                 .offset(15.0)
                 .spacing(5.0)
