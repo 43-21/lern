@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use iced::{
     alignment::{Horizontal, Vertical},
     border::Radius,
@@ -25,6 +27,20 @@ use crate::{
 use super::Tab;
 
 static INPUT_ID: Lazy<Id> = Lazy::new(Id::unique);
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub enum WordClass {
+    Noun,
+    Verb,
+    Adjective,
+    Adverb,
+    Determiner,
+    Particle,
+    Interjection,
+    Conjunction,
+    Pronoun,
+    Preposition,
+}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -63,6 +79,8 @@ pub enum Message {
     OrderFrequency(bool),
     OrderGeneralFrequency(bool),
     OrderFirstOccurence(bool),
+    ClassButtonPressed,
+    ClassToggled(bool, WordClass),
     Error(String),
 }
 
@@ -77,6 +95,7 @@ pub struct AddTab {
     order_frequency: bool,
     order_general_frequency: bool,
     order_first_occurence: bool,
+    word_classes: HashSet<WordClass>,
     ignored_from_queue: usize,
     next_word: Option<(String, Vec<Entry>)>,
     next_sentences: Option<Vec<String>>,
@@ -98,6 +117,18 @@ impl AddTab {
             order_frequency: true,
             order_general_frequency: true,
             order_first_occurence: true,
+            word_classes: HashSet::from([
+                WordClass::Noun,
+                WordClass::Adjective,
+                WordClass::Adverb,
+                WordClass::Conjunction,
+                WordClass::Determiner,
+                WordClass::Interjection,
+                WordClass::Particle,
+                WordClass::Preposition,
+                WordClass::Pronoun,
+                WordClass::Verb,
+            ]),
         }
     }
 
@@ -301,6 +332,15 @@ impl AddTab {
                 self.order_first_occurence = value;
                 Task::none()
             }
+            Message::ClassButtonPressed => Task::none(),
+            Message::ClassToggled(value, class) => {
+                if value {
+                    self.word_classes.insert(class);
+                } else {
+                    self.word_classes.remove(&class);
+                }
+                Task::none()
+            }
         }
     }
 }
@@ -402,8 +442,57 @@ impl Tab for AddTab {
             Some(Scrollable::new(entry_column).width(Length::Fill))
         };
 
+        let word_class_menu = menu_bar!((
+            Button::new(Text::new("Include...")).on_press(Message::ClassButtonPressed),
+            {
+                Menu::new(menu_items!(
+                    (Checkbox::new("nouns", self.word_classes.contains(&WordClass::Noun))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Noun))
+                        .width(Length::Fill))
+                    (Checkbox::new("verbs", self.word_classes.contains(&WordClass::Verb))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Verb))
+                        .width(Length::Fill))
+                    (Checkbox::new("adjectives", self.word_classes.contains(&WordClass::Adjective))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Adjective))
+                        .width(Length::Fill))
+                    (Checkbox::new("determiners", self.word_classes.contains(&WordClass::Determiner))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Determiner))
+                        .width(Length::Fill))
+                    (Checkbox::new("adverbs", self.word_classes.contains(&WordClass::Adverb))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Adverb))
+                        .width(Length::Fill))
+                    (Checkbox::new("interjections", self.word_classes.contains(&WordClass::Interjection))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Interjection))
+                        .width(Length::Fill))
+                    (Checkbox::new("particles", self.word_classes.contains(&WordClass::Particle))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Particle))
+                        .width(Length::Fill))
+                    (Checkbox::new("conjunctions", self.word_classes.contains(&WordClass::Conjunction))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Conjunction))
+                        .width(Length::Fill))
+                    (Checkbox::new("prepositions", self.word_classes.contains(&WordClass::Preposition))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Preposition))
+                        .width(Length::Fill))
+                    (Checkbox::new("pronouns", self.word_classes.contains(&WordClass::Pronoun))
+                        .on_toggle(|value| Message::ClassToggled(value, WordClass::Pronoun))
+                        .width(Length::Fill))
+                ))
+                .max_width(180.0)
+                .offset(15.0)
+                .spacing(5.0)
+            }
+        ))
+        .draw_path(DrawPath::Backdrop)
+        .style(|theme: &iced::Theme, status: Status| iced_aw::menu::Style {
+            path_border: Border {
+                radius: Radius::new(6.0),
+                ..Default::default()
+            },
+            ..menu_bar::primary(theme, status)
+        });
+
         let order_menu = menu_bar!((
-            Button::new(Text::new("Order by")).on_press(Message::OrderButtonPressed),
+            Button::new(Text::new("Order by...")).on_press(Message::OrderButtonPressed),
             {
                 Menu::new(menu_items!((Checkbox::new(
                     "frequency in texts",
@@ -437,7 +526,8 @@ impl Tab for AddTab {
             .padding(20)
             .spacing(16)
             .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue))
-            .push(order_menu);
+            .push(order_menu)
+            .push(word_class_menu);
 
         let button_row = if self.from_queue {
             Row::new()
