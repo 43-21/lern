@@ -21,4 +21,4 @@ features = ["tokio"]
 #path = "./iced_aw/"
 git = "https://github.com/iced-rs/iced_aw.git"
 default-features = false
-features = ["tabs"]
+features = ["tabs", "menu"]
