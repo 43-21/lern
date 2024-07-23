@@ -62,16 +62,24 @@ impl MainTab {
                 println!("{e}");
                 Task::none()
             }
-            Message::SetWiktionaryFile => Task::perform(AsyncFileDialog::new().set_title("Wiktionary").add_filter("JSON Lines", &["jsonl"]).pick_file(), |file_handle| {
-                Message::WiktionaryFileSet {
+            Message::SetWiktionaryFile => Task::perform(
+                AsyncFileDialog::new()
+                    .set_title("Wiktionary")
+                    .add_filter("JSON Lines", &["jsonl"])
+                    .pick_file(),
+                |file_handle| Message::WiktionaryFileSet {
                     path: file_handle.map(|file_handle| file_handle.into()),
-                }
-            }),
-            Message::SetFrequencyFile => Task::perform(AsyncFileDialog::new().set_title("Frequency").add_filter("text", &["txt"]).pick_file(), |file_handle| {
-                Message::FrequencyFileSet {
+                },
+            ),
+            Message::SetFrequencyFile => Task::perform(
+                AsyncFileDialog::new()
+                    .set_title("Frequency")
+                    .add_filter("text", &["txt"])
+                    .pick_file(),
+                |file_handle| Message::FrequencyFileSet {
                     path: file_handle.map(|file_handle| file_handle.into()),
-                }
-            }),
+                },
+            ),
             Message::WiktionaryFileSet { path } => {
                 if path.is_some() {
                     self.wiktionary_path = path;
@@ -84,22 +92,33 @@ impl MainTab {
                 }
                 Task::none()
             }
-            Message::CreateSchedule => Task::perform(database::create_schedule(), |res| match res {
-                Err(e) => Message::Error(e.to_string()),
-                Ok(()) => Message::ScheduleCreated,
-            }),
-            Message::CreateQueue => Task::perform(database::create_queue(self.keep_blacklist), |res| match res {
-                Err(e) => Message::Error(e.to_string()),
-                Ok(()) => Message::QueueCreated,
-            }),
-            Message::CreateDictionary => Task::perform(database::create_dictionary(self.wiktionary_path.clone().unwrap()), |res| match res {
-                Err(e) => Message::Error(e.to_string()),
-                Ok(()) => Message::DictionaryCreated,
-            }),
-            Message::CreateFrequency => Task::perform(database::create_frequency(self.frequency_path.clone().unwrap()), |res| match res {
-                Err(e) => Message::Error(e.to_string()),
-                Ok(()) => Message::FrequencyCreated,
-            }),
+            Message::CreateSchedule => {
+                Task::perform(database::create_schedule(), |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::ScheduleCreated,
+                })
+            }
+            Message::CreateQueue => Task::perform(
+                database::create_queue(self.keep_blacklist),
+                |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::QueueCreated,
+                },
+            ),
+            Message::CreateDictionary => Task::perform(
+                database::create_dictionary(self.wiktionary_path.clone().unwrap()),
+                |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::DictionaryCreated,
+                },
+            ),
+            Message::CreateFrequency => Task::perform(
+                database::create_frequency(self.frequency_path.clone().unwrap()),
+                |res| match res {
+                    Err(e) => Message::Error(e.to_string()),
+                    Ok(()) => Message::FrequencyCreated,
+                },
+            ),
             Message::ScheduleCreated => {
                 self.schedule = true;
                 Task::none()
@@ -209,8 +228,12 @@ impl Tab for MainTab {
             .align_y(Alignment::Center)
             .padding(20)
             .spacing(16)
-            .push(Button::new(Text::new("Load dictionary file")).on_press(Message::SetWiktionaryFile))
-            .push(Button::new(Text::new("Load frequency file")).on_press(Message::SetFrequencyFile));
+            .push(
+                Button::new(Text::new("Load dictionary file")).on_press(Message::SetWiktionaryFile),
+            )
+            .push(
+                Button::new(Text::new("Load frequency file")).on_press(Message::SetFrequencyFile),
+            );
 
         let create_row = Row::new()
             .align_y(Alignment::Center)
@@ -228,7 +251,10 @@ impl Tab for MainTab {
             .push_maybe(schedule)
             .push(Button::new(Text::new("Create schedule")).on_press(Message::CreateSchedule))
             .push(Button::new(Text::new("Create queue")).on_press(Message::CreateQueue))
-            .push(Checkbox::new("Keep blacklist", self.keep_blacklist).on_toggle(Message::KeepBlacklist))
+            .push(
+                Checkbox::new("Keep blacklist", self.keep_blacklist)
+                    .on_toggle(Message::KeepBlacklist),
+            )
             .push_maybe(queue);
 
         let content: Element<'_, Message> = Container::new(
@@ -239,7 +265,9 @@ impl Tab for MainTab {
                 .push(file_row)
                 .push(create_row)
                 .push(clear_row)
-                .push(Button::new(Text::new("Export to Anki")).on_press(Message::SetExportLocation)),
+                .push(
+                    Button::new(Text::new("Export to Anki")).on_press(Message::SetExportLocation),
+                ),
         )
         .align_x(Horizontal::Center)
         .align_y(Vertical::Center)

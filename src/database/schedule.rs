@@ -70,7 +70,13 @@ pub async fn insert_card(card: Card) -> Result<()> {
         conn.execute(
             "INSERT INTO cards(native, russian, due, stability, difficulty)
                 VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![card.native, card.russian, card.due, card.stability, card.difficulty],
+            params![
+                card.native,
+                card.russian,
+                card.due,
+                card.stability,
+                card.difficulty
+            ],
         )?;
         Ok(())
     })
@@ -93,7 +99,14 @@ pub async fn update_cards(conn: &mut Connection, cards: Vec<Card>) -> Result<()>
         )?;
 
         for card in cards {
-            stmt.execute(params![card.native, card.russian, card.due, card.stability, card.difficulty, card.id])?;
+            stmt.execute(params![
+                card.native,
+                card.russian,
+                card.due,
+                card.stability,
+                card.difficulty,
+                card.id
+            ])?;
         }
 
         drop(stmt);
@@ -108,7 +121,9 @@ pub async fn update_cards(conn: &mut Connection, cards: Vec<Card>) -> Result<()>
 }
 
 pub async fn export(path: PathBuf) -> Result<()> {
-    let mut file = fs::File::create(path).await.expect("error when attempting to create file");
+    let mut file = fs::File::create(path)
+        .await
+        .expect("error when attempting to create file");
 
     let conn = Connection::open("./db/database.db").await?;
     let buffer = conn
@@ -131,7 +146,9 @@ pub async fn export(path: PathBuf) -> Result<()> {
         })
         .await?;
 
-    file.write_all(buffer.as_bytes()).await.expect("error when writing into file");
+    file.write_all(buffer.as_bytes())
+        .await
+        .expect("error when writing into file");
 
     Ok(())
 }

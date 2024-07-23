@@ -54,16 +54,22 @@ impl LemmatizeTab {
                     Err(e) => Task::done(Message::Error(e.to_string())),
                 })
             }
-            Message::FromFile => Task::perform(AsyncFileDialog::new().set_title("From file").add_filter("text", &["txt", "srt"]).pick_file(), |file_handle| {
-                Message::FileSet {
+            Message::FromFile => Task::perform(
+                AsyncFileDialog::new()
+                    .set_title("From file")
+                    .add_filter("text", &["txt", "srt"])
+                    .pick_file(),
+                |file_handle| Message::FileSet {
                     path: file_handle.map(|file_handle| file_handle.into()),
-                }
-            }),
+                },
+            ),
             Message::FileSet { path } => {
                 if let Some(path) = path {
-                    Task::future(lemmatize_from_file(path, self.add_sentences)).then(|result| match result {
-                        Ok(()) => Task::none(),
-                        Err(e) => Task::done(Message::Error(e.to_string())),
+                    Task::future(lemmatize_from_file(path, self.add_sentences)).then(|result| {
+                        match result {
+                            Ok(()) => Task::none(),
+                            Err(e) => Task::done(Message::Error(e.to_string())),
+                        }
                     })
                 } else {
                     Task::none()
@@ -103,8 +109,15 @@ impl Tab for LemmatizeTab {
                         .align_x(Alignment::Center)
                         .padding(20)
                         .spacing(8)
-                        .push(Checkbox::new("Add sentences", self.add_sentences).on_toggle(Message::AddSentences))
-                        .push(text_editor(&self.content).height(Length::Fill).on_action(Message::ActionPerformed))
+                        .push(
+                            Checkbox::new("Add sentences", self.add_sentences)
+                                .on_toggle(Message::AddSentences),
+                        )
+                        .push(
+                            text_editor(&self.content)
+                                .height(Length::Fill)
+                                .on_action(Message::ActionPerformed),
+                        )
                         .push(Button::new(Text::new("From file")).on_press(Message::FromFile)),
                 )
                 .push(Button::new(Text::new("Lemmatize")).on_press(Message::Lemmatize)),

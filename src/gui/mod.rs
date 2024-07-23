@@ -71,7 +71,11 @@ impl App {
         Tabs::new(Message::TabSelected)
             .push(TabId::Main, self.main_tab.tab_label(), self.main_tab.view())
             .push(TabId::Add, self.add_tab.tab_label(), self.add_tab.view())
-            .push(TabId::Lemmatize, self.lemmatize_tab.tab_label(), self.lemmatize_tab.view())
+            .push(
+                TabId::Lemmatize,
+                self.lemmatize_tab.tab_label(),
+                self.lemmatize_tab.view(),
+            )
             .set_active_tab(&self.active_tab)
             .into()
     }
@@ -85,7 +89,10 @@ trait Tab {
     fn tab_label(&self) -> TabLabel;
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let column = Column::new().spacing(20).push(self.content()).align_x(iced::Alignment::Center);
+        let column = Column::new()
+            .spacing(20)
+            .push(self.content())
+            .align_x(iced::Alignment::Center);
 
         Container::new(column)
             .width(Length::Fill)

@@ -8,14 +8,21 @@ use crate::database::dictionary;
 
 async fn lemmatize_sentences(text: String) -> Result<()> {
     let regex = Regex::new(r"[^\s»—][^\r\n\t\v\f.?!…]*[.?!…\n\r\t\v\f]+»*").unwrap();
-    let sentences: Vec<String> = regex.find_iter(&text).map(|m| m.as_str().trim().to_owned()).collect();
+    let sentences: Vec<String> = regex
+        .find_iter(&text)
+        .map(|m| m.as_str().trim().to_owned())
+        .collect();
 
     let mut sentences_with_forms = Vec::new();
 
     let mut current_word_index = 0;
     for sentence in sentences {
         let regex = Regex::new(r"[^А-яёЁ]").unwrap();
-        let forms: Vec<String> = regex.replace_all(&sentence, " ").split_whitespace().map(|s| s.to_lowercase()).collect();
+        let forms: Vec<String> = regex
+            .replace_all(&sentence, " ")
+            .split_whitespace()
+            .map(|s| s.to_lowercase())
+            .collect();
 
         let mut tuples = Vec::new();
         for (i, form) in forms.into_iter().enumerate() {
@@ -34,7 +41,11 @@ pub async fn lemmatize(text: String, add_sentences: bool) -> Result<()> {
         return lemmatize_sentences(text).await;
     }
     let regex = Regex::new(r"[^А-яёЁ]").unwrap();
-    let forms: Vec<String> = regex.replace_all(&text, " ").split_whitespace().map(|s| s.to_lowercase()).collect();
+    let forms: Vec<String> = regex
+        .replace_all(&text, " ")
+        .split_whitespace()
+        .map(|s| s.to_lowercase())
+        .collect();
 
     let mut hash_map = HashMap::new();
     for (i, form) in forms.into_iter().enumerate() {
@@ -54,7 +65,17 @@ pub async fn lemmatize_from_file(path: PathBuf, add_sentences: bool) -> Result<(
 }
 
 pub fn remove_accents(mut word: String) -> String {
-    let patterns = vec![(r"а́", "а"), (r"е́", "е"), (r"и́", "и"), (r"о́", "о"), (r"у́", "у"), (r"э́", "э"), (r"ы́", "ы"), (r"ю́", "ю"), (r"я́", "я")];
+    let patterns = vec![
+        (r"а́", "а"),
+        (r"е́", "е"),
+        (r"и́", "и"),
+        (r"о́", "о"),
+        (r"у́", "у"),
+        (r"э́", "э"),
+        (r"ы́", "ы"),
+        (r"ю́", "ю"),
+        (r"я́", "я"),
+    ];
 
     for (pattern, replacement) in patterns {
         let re = Regex::new(pattern).unwrap();

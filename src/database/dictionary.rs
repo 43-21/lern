@@ -172,26 +172,36 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
 }
 
 fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> {
-    let mut word_stmt_expansion = ta.prepare("INSERT INTO words (word, pos, expansion) VALUES (?1, ?2, ?3)")?;
-    let mut word_stmt_etymology_expansion = ta.prepare("INSERT INTO words (word, pos, etymology, expansion) VALUES (?1, ?2, ?3, ?4)")?;
-    let mut word_stmt_etymology = ta.prepare("INSERT INTO words (word, pos, etymology) VALUES (?1, ?2, ?3)")?;
+    let mut word_stmt_expansion =
+        ta.prepare("INSERT INTO words (word, pos, expansion) VALUES (?1, ?2, ?3)")?;
+    let mut word_stmt_etymology_expansion =
+        ta.prepare("INSERT INTO words (word, pos, etymology, expansion) VALUES (?1, ?2, ?3, ?4)")?;
+    let mut word_stmt_etymology =
+        ta.prepare("INSERT INTO words (word, pos, etymology) VALUES (?1, ?2, ?3)")?;
     let mut word_stmt = ta.prepare("INSERT INTO words (word, pos) VALUES (?1, ?2)")?;
 
-    let mut sense_stmt_gloss = ta.prepare("INSERT INTO senses (word_id, sense, relevance) VALUES (?1, ?2, ?3)")?;
+    let mut sense_stmt_gloss =
+        ta.prepare("INSERT INTO senses (word_id, sense, relevance) VALUES (?1, ?2, ?3)")?;
     let mut sense_stmt = ta.prepare("INSERT INTO senses (word_id, relevance) VALUES (?1, ?2)")?;
-    let mut sense_tag_stmt = ta.prepare("INSERT INTO sense_tags (sense_id, tag) VALUES (?1, ?2)")?;
+    let mut sense_tag_stmt =
+        ta.prepare("INSERT INTO sense_tags (sense_id, tag) VALUES (?1, ?2)")?;
 
-    let mut example_stmt_english = ta.prepare("INSERT INTO examples (sense_id, text, english) VALUES (?1, ?2, ?3)")?;
+    let mut example_stmt_english =
+        ta.prepare("INSERT INTO examples (sense_id, text, english) VALUES (?1, ?2, ?3)")?;
     let mut example_stmt = ta.prepare("INSERT INTO examples (sense_id, text) VALUES (?1, ?2)")?;
 
     let mut synonym_stmt = ta.prepare("INSERT INTO synonyms (synonym) VALUES (?1)")?;
-    let mut sense_synonym_stmt = ta.prepare("INSERT INTO sense_synonyms (sense_id, synonym_id) VALUES (?1, ?2)")?;
+    let mut sense_synonym_stmt =
+        ta.prepare("INSERT INTO sense_synonyms (sense_id, synonym_id) VALUES (?1, ?2)")?;
 
-    let mut form_stmt = ta.prepare("INSERT INTO forms (form, word_id, normalized_form) VALUES (?1, ?2, ?3)")?;
+    let mut form_stmt =
+        ta.prepare("INSERT INTO forms (form, word_id, normalized_form) VALUES (?1, ?2, ?3)")?;
     let mut form_tag_stmt = ta.prepare("INSERT INTO form_tags (form_id, tag) VALUES (?1, ?2)")?;
 
-    let mut pronunciation_stmt = ta.prepare("INSERT INTO pronunciation (word_id, ipa) VALUES (?1, ?2)")?;
-    let mut pronunciation_tag_stmt = ta.prepare("INSERT INTO pronunciation_tags (pronunciation_id, tag) VALUES (?1, ?2)")?;
+    let mut pronunciation_stmt =
+        ta.prepare("INSERT INTO pronunciation (word_id, ipa) VALUES (?1, ?2)")?;
+    let mut pronunciation_tag_stmt =
+        ta.prepare("INSERT INTO pronunciation_tags (pronunciation_id, tag) VALUES (?1, ?2)")?;
 
     let lines = read_lines(path_to_wiktionary).unwrap();
 
@@ -200,16 +210,29 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
         let word = json.get("word").unwrap().as_str().unwrap();
         let pos = json.get("pos").unwrap().as_str().unwrap();
-        let etymology = json.get("etymology_text").map(|etymology| etymology.as_str().unwrap());
+        let etymology = json
+            .get("etymology_text")
+            .map(|etymology| etymology.as_str().unwrap());
 
-        if !["noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron"].contains(&pos) {
+        if ![
+            "noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron",
+        ]
+        .contains(&pos)
+        {
             continue 'iteration;
         }
 
         let head_templates = json.get("head_templates");
         let expansion = {
             if let Some(head_templates) = head_templates {
-                head_templates.as_array().unwrap().first().unwrap().get("expansion").unwrap().as_str()
+                head_templates
+                    .as_array()
+                    .unwrap()
+                    .first()
+                    .unwrap()
+                    .get("expansion")
+                    .unwrap()
+                    .as_str()
             } else {
                 None
             }
@@ -252,7 +275,9 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
         let senses = json.get("senses").unwrap().as_array().unwrap();
         for (i, sense) in senses.iter().enumerate() {
-            let gloss = sense.get("glosses").map(|glosses| glosses.as_array().unwrap()[0].as_str().unwrap());
+            let gloss = sense
+                .get("glosses")
+                .map(|glosses| glosses.as_array().unwrap()[0].as_str().unwrap());
 
             if let Some(gloss) = gloss {
                 sense_stmt_gloss.execute(params![word_id, gloss, i])?;
@@ -286,7 +311,9 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
             for example in examples {
                 let text = example.get("text").unwrap().as_str().unwrap();
-                let english = example.get("english").map(|english| english.as_str().unwrap());
+                let english = example
+                    .get("english")
+                    .map(|english| english.as_str().unwrap());
 
                 if let Some(english) = english {
                     example_stmt_english.execute(params![sense_id, text, english])?;
@@ -385,9 +412,11 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
 
             let mut form_tag_stmt = ta.prepare("SELECT tag FROM form_tags WHERE form_id = ?1")?;
 
-            let mut sense_stmt = ta.prepare("SELECT id, sense FROM senses WHERE word_id = ?1 ORDER BY relevance")?;
+            let mut sense_stmt =
+                ta.prepare("SELECT id, sense FROM senses WHERE word_id = ?1 ORDER BY relevance")?;
 
-            let mut example_stmt = ta.prepare("SELECT text, english FROM examples WHERE sense_id = ?1")?;
+            let mut example_stmt =
+                ta.prepare("SELECT text, english FROM examples WHERE sense_id = ?1")?;
 
             let mut synonym_stmt = ta.prepare(
                 "SELECT synonym FROM synonyms
@@ -396,9 +425,11 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                 WHERE sense_id = ?1",
             )?;
 
-            let mut sense_tag_stmt = ta.prepare("SELECT tag FROM sense_tags JOIN senses ON sense_id = id WHERE id = ?1")?;
+            let mut sense_tag_stmt = ta
+                .prepare("SELECT tag FROM sense_tags JOIN senses ON sense_id = id WHERE id = ?1")?;
 
-            let mut pronunciation_stmt = ta.prepare("SELECT id, ipa FROM pronunciation WHERE word_id = ?1")?;
+            let mut pronunciation_stmt =
+                ta.prepare("SELECT id, ipa FROM pronunciation WHERE word_id = ?1")?;
 
             let mut pronunciation_tag_stmt = ta.prepare(
                 "SELECT tag FROM pronunciation_tags
@@ -436,7 +467,8 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
 
                     let mut tags = Vec::new();
 
-                    let tag_iter = form_tag_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
+                    let tag_iter =
+                        form_tag_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
 
                     for tag in tag_iter {
                         tags.push(tag?);
@@ -471,19 +503,26 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
                         examples.push(Example { text, english })
                     }
 
-                    let synonym_iter = synonym_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
+                    let synonym_iter =
+                        synonym_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
 
                     for synonym in synonym_iter {
                         synonyms.push(synonym?);
                     }
 
-                    let tag_iter = sense_tag_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
+                    let tag_iter =
+                        sense_tag_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
 
                     for tag in tag_iter {
                         tags.push(tag?);
                     }
 
-                    senses.push(Sense { sense, examples, synonyms, tags })
+                    senses.push(Sense {
+                        sense,
+                        examples,
+                        synonyms,
+                        tags,
+                    })
                 }
 
                 let pronunciation_iter = pronunciation_stmt.query_map([id], |row| {
@@ -498,7 +537,8 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
 
                     let mut tags = Vec::new();
 
-                    let tag_iter = pronunciation_tag_stmt.query_map([id], |row| row.get::<usize, String>(0))?;
+                    let tag_iter = pronunciation_tag_stmt
+                        .query_map([id], |row| row.get::<usize, String>(0))?;
 
                     for tag in tag_iter {
                         tags.push(tag?);

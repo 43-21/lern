@@ -4,9 +4,11 @@ use crate::dictionary;
 
 pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result<()> {
     conn.call(move |conn| {
-        let row: rusqlite::Result<String> = conn.query_row("SELECT name FROM sqlite_schema WHERE type='table' AND name='lemmas'", [], |row| {
-            row.get(0)
-        });
+        let row: rusqlite::Result<String> = conn.query_row(
+            "SELECT name FROM sqlite_schema WHERE type='table' AND name='lemmas'",
+            [],
+            |row| row.get(0),
+        );
 
         let table_exists = row.is_ok();
 
@@ -43,7 +45,12 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
     Ok(())
 }
 
-pub async fn get_lemmas_queue(start: usize, by_frequency: bool, by_general_frequency: bool, by_first_occurence: bool) -> Result<Vec<String>> {
+pub async fn get_lemmas_queue(
+    start: usize,
+    by_frequency: bool,
+    by_general_frequency: bool,
+    by_first_occurence: bool,
+) -> Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
     let queue = conn
