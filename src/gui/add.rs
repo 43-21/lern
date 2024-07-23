@@ -20,27 +20,13 @@ use once_cell::sync::Lazy;
 
 use crate::{
     database::{dictionary, queue, schedule},
-    dictionary::entry::Entry,
+    dictionary::{entry::Entry, WordClass},
     fsrs::card::Card,
 };
 
 use super::Tab;
 
 static INPUT_ID: Lazy<Id> = Lazy::new(Id::unique);
-
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub enum WordClass {
-    Noun,
-    Verb,
-    Adjective,
-    Adverb,
-    Determiner,
-    Particle,
-    Interjection,
-    Conjunction,
-    Pronoun,
-    Preposition,
-}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -211,6 +197,7 @@ impl AddTab {
                         self.order_frequency,
                         self.order_general_frequency,
                         self.order_first_occurence,
+                        self.word_classes.clone()
                     ))
                     .then(move |lemmas| match lemmas {
                         Ok(lemmas) => Task::done(Message::QueueRead { lemmas }),

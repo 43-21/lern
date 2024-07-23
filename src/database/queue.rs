@@ -1,6 +1,8 @@
+use std::collections::HashSet;
+
 use tokio_rusqlite::{Connection, Result};
 
-use crate::dictionary;
+use crate::dictionary::{self, WordClass};
 
 pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result<()> {
     conn.call(move |conn| {
@@ -50,6 +52,7 @@ pub async fn get_lemmas_queue(
     by_frequency: bool,
     by_general_frequency: bool,
     by_first_occurence: bool,
+    word_classes: HashSet<WordClass>,
 ) -> Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
@@ -87,37 +90,76 @@ pub async fn get_lemmas_queue(
                 );
             }
 
+            let (join_str, where_str) = if word_classes.is_empty() {
+                ("", String::from(""))
+            }
+            else {
+                let mut string = String::from("AND pos IN (");
+                for class in word_classes {
+                    string += format!("'{}', ", class).as_str();
+                }
+                string = string.trim_end_matches(", ").to_owned() + ")";
+                ("JOIN words ON lemma = word", string)
+            };
+
+            let (min_max_string, order_by_string) = {
+                if row_number_clauses.len() == 1 {
+                    if by_frequency {
+                        (String::from(",\nrow_num_by_frequency"), String::from("ORDER BY row_num_by_frequency"))
+                    }
+                    else if by_general_frequency {
+                        (String::from(",\nrow_num_by_general_frequency"), String::from("ORDER BY row_num_by_general_frequency"))
+                    }
+                    else {
+                        (String::from(",\nrow_num_by_first_occurence"), String::from("ORDER BY row_num_by_first_occurence"))
+                    }
+                }
+                else {
+                    (
+                        format!(
+                            ",\nMIN({}) AS smallest,
+                            MAX({}) AS largest",
+                            min_args.join(", "),
+                            max_args.join(", "),
+                        ),
+                        format!(
+                            "ORDER BY
+                            smallest{},
+                            largest",
+                            if by_frequency && by_general_frequency && by_first_occurence {
+                                String::from(
+                                    ",\nCASE
+                                        WHEN smallest < row_num_by_frequency AND row_num_by_frequency < largest
+                                            THEN row_num_by_frequency
+                                        WHEN smallest < row_num_by_general_frequency AND row_num_by_general_frequency < largest
+                                            THEN row_num_by_general_frequency
+                                        ELSE 1.5 * row_num_by_first_occurence
+                                    END",
+                                )
+                            } else {
+                                String::from("")
+                            }
+                        )
+                    )
+                }
+            };
+
             let query = if !min_args.is_empty() {
                 format!(
-                    "SELECT lemma,
-                    MIN({}) AS smallest,
-                    MAX({}) AS largest
+                    "SELECT lemma{}
                     FROM (
                         SELECT lemma,
                         {}
-                        FROM lemmas
-                        WHERE blacklisted = 0
+                        FROM lemmas {}
+                        WHERE blacklisted = 0 {} GROUP BY lemma
                     ) temp_table
-                    ORDER BY
-                        smallest{},
-                        largest
+                    {}
                     LIMIT ?1,200",
-                    min_args.join(", "),
-                    max_args.join(", "),
+                    min_max_string,
                     row_number_clauses.join(",\n"),
-                    if by_frequency && by_general_frequency && by_first_occurence {
-                        String::from(
-                            ",\nCASE
-                                WHEN smallest < row_num_by_frequency AND row_num_by_frequency < largest
-                                    THEN row_num_by_frequency
-                                WHEN smallest < row_num_by_general_frequency AND row_num_by_general_frequency < largest
-                                    THEN row_num_by_general_frequency
-                                ELSE 1.5 * row_num_by_first_occurence
-                            END",
-                        )
-                    } else {
-                        String::from("")
-                    }
+                    join_str,
+                    where_str,
+                    order_by_string,
                 )
             } else {
                 String::from("SELECT lemma FROM lemmas WHERE blacklisted = 0 LIMIT ?1,200")
