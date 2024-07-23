@@ -1,13 +1,11 @@
 use iced::{
-    alignment::{Horizontal, Vertical},
-    widget::{
+    alignment::{Horizontal, Vertical}, border::Radius, widget::{
         text::Shaping,
         text_input::{focus, Id},
         Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput,
-    },
-    Alignment, Element, Length, Task,
+    }, Alignment, Border, Element, Length, Task
 };
-use iced_aw::TabLabel;
+use iced_aw::{menu::{DrawPath, Item, Menu}, menu_bar, menu_items, style::{menu_bar, Status}, TabLabel};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -37,6 +35,10 @@ pub enum Message {
     QueueRead { lemmas: Vec<String> },
     Blacklist,
     Ignore,
+    OrderButtonPressed,
+    OrderFrequency(bool),
+    OrderGeneralFrequency(bool),
+    OrderFirstOccurence(bool),
     Error(String),
 }
 
@@ -48,6 +50,9 @@ pub struct AddTab {
     sentences: Vec<String>,
     lemmas: Vec<String>,
     from_queue: bool,
+    order_frequency: bool,
+    order_general_frequency: bool,
+    order_first_occurence: bool,
     ignored_from_queue: usize,
     next_word: Option<(String, Vec<Entry>)>,
     next_sentences: Option<Vec<String>>,
@@ -66,6 +71,9 @@ impl AddTab {
             ignored_from_queue: 0,
             next_word: None,
             next_sentences: None,
+            order_frequency: true,
+            order_general_frequency: true,
+            order_first_occurence: true,
         }
     }
 
@@ -219,6 +227,19 @@ impl AddTab {
                     ])
                 }
             }
+            Message::OrderButtonPressed => Task::none(),
+            Message::OrderFrequency(value) => {
+                self.order_frequency = value;
+                Task::none()
+            }
+            Message::OrderGeneralFrequency(value) => {
+                self.order_general_frequency = value;
+                Task::none()
+            }
+            Message::OrderFirstOccurence(value) => {
+                self.order_first_occurence = value;
+                Task::none()
+            }
         }
     }
 }
@@ -235,15 +256,6 @@ impl Tab for AddTab {
     }
 
     fn content(&self) -> iced::Element<'_, Self::Message> {
-        let button_row = if self.from_queue {
-            Row::new()
-                .push(Button::new(Text::new("Ignore").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Ignore))
-                .push(Button::new(Text::new("Add").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Add))
-                .push(Button::new(Text::new("Blacklist").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Blacklist))
-        } else {
-            Row::new().push(Button::new(Text::new("Add").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Add))
-        };
-
         let mut entry_column = Column::new().align_x(Alignment::Start).padding(20).spacing(16);
 
         for entry in &self.entries {
@@ -300,6 +312,40 @@ impl Tab for AddTab {
 
         let entry_scrollable = if self.entries.is_empty() { None } else { Some(Scrollable::new(entry_column).width(Length::Fill)) };
 
+        let order_menu = menu_bar!(
+            (Button::new(Text::new("Order by")).on_press(Message::OrderButtonPressed), {
+                Menu::new(menu_items!(
+                    (Checkbox::new("frequency in texts", self.order_frequency).on_toggle(Message::OrderFrequency).width(Length::Fill))
+                    (Checkbox::new("general frequency", self.order_general_frequency).on_toggle(Message::OrderGeneralFrequency).width(Length::Fill))
+                    (Checkbox::new("first occurence", self.order_first_occurence).on_toggle(Message::OrderFirstOccurence).width(Length::Fill))
+                ))
+                .max_width(180.0).offset(15.0).spacing(5.0)
+            })
+        )
+        .draw_path(DrawPath::Backdrop)
+        .style(|theme:&iced::Theme, status: Status | iced_aw::menu::Style{
+            path_border: Border {
+                radius: Radius::new(6.0),
+                ..Default::default()
+            },
+            ..menu_bar::primary(theme, status)
+        });
+
+        let settings_row: Row<Message> = Row::new()
+            .padding(20)
+            .spacing(16)
+            .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue))
+            .push(order_menu);
+
+        let button_row = if self.from_queue {
+            Row::new()
+                .push(Button::new(Text::new("Ignore").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Ignore))
+                .push(Button::new(Text::new("Add").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Add))
+                .push(Button::new(Text::new("Blacklist").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Blacklist))
+        } else {
+            Row::new().push(Button::new(Text::new("Add").align_x(Horizontal::Center)).width(Length::Fill).on_press(Message::Add))
+        };
+
         let column = Column::new()
             .align_x(Alignment::Center)
             .max_width(600)
@@ -315,7 +361,7 @@ impl Tab for AddTab {
                     .on_submit(Message::Add),
             )
             .push(button_row)
-            .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue));
+            .push(settings_row);
 
         let content: Element<'_, Message> = Container::new(Row::new().align_y(Alignment::Center).push(column.width(Length::Fill)).push_maybe(entry_scrollable))
             .align_x(Horizontal::Center)
