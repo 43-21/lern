@@ -58,13 +58,11 @@ pub async fn get_lemmas_queue(
 
     let queue = conn
         .call(move |conn| {
-            let mut min_args = Vec::new();
-            let mut max_args = Vec::new();
+            let mut args = Vec::new();
             let mut row_number_clauses = Vec::new();
 
             if by_frequency {
-                min_args.push("row_num_by_frequency");
-                max_args.push("row_num_by_frequency");
+                args.push("row_num_by_frequency");
                 row_number_clauses.push(
                     "ROW_NUMBER() OVER (
                         ORDER BY frequency DESC
@@ -72,8 +70,7 @@ pub async fn get_lemmas_queue(
                 );
             }
             if by_general_frequency {
-                min_args.push("row_num_by_general_frequency");
-                max_args.push("row_num_by_general_frequency");
+                args.push("row_num_by_general_frequency");
                 row_number_clauses.push(
                     "ROW_NUMBER() OVER (
                         ORDER BY general_frequency
@@ -81,8 +78,7 @@ pub async fn get_lemmas_queue(
                 );
             }
             if by_first_occurence {
-                min_args.push("1.5 * row_num_by_first_occurence");
-                max_args.push("1.5 * row_num_by_first_occurence");
+                args.push("1.5 * row_num_by_first_occurence");
                 row_number_clauses.push(
                     "ROW_NUMBER() OVER (
                         ORDER BY first_occurence
@@ -115,12 +111,13 @@ pub async fn get_lemmas_queue(
                     }
                 }
                 else {
+                    let args_string = args.join(", ");
                     (
                         format!(
                             ",\nMIN({}) AS smallest,
                             MAX({}) AS largest",
-                            min_args.join(", "),
-                            max_args.join(", "),
+                            args_string,
+                            args_string,
                         ),
                         format!(
                             "ORDER BY
@@ -144,7 +141,7 @@ pub async fn get_lemmas_queue(
                 }
             };
 
-            let query = if !min_args.is_empty() {
+            let query = if !args.is_empty() {
                 format!(
                     "SELECT lemma{}
                     FROM (
