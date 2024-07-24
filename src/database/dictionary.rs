@@ -605,7 +605,8 @@ pub async fn lemmatize_sentences(sentences: Vec<(String, Vec<(String, usize)>)>)
                 JOIN frequency ON words.id = frequency.word_id
                 WHERE normalized_form = ?2
                 GROUP BY words.id
-            ) AS lemmas WHERE (SELECT COUNT(*) FROM SENTENCES WHERE lemma = lemmas.lemma) < 5",
+            ) AS lemmas WHERE (SELECT COUNT(*) FROM sentences WHERE lemma = lemmas.lemma) < 5
+                AND NOT EXISTS (SELECT 1 FROM sentences WHERE lemma = lemmas.lemma AND sentence = ?1)",
         )?;
 
         let start = std::time::Instant::now();
