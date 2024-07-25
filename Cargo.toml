@@ -15,7 +15,7 @@ tokio-rusqlite = "0.5.1"
 
 [dependencies.iced]
 git = "https://github.com/iced-rs/iced.git"
-features = ["tokio"]
+features = ["tokio", "markdown"]
 
 [dependencies.iced_aw]
 #path = "./iced_aw/"

@@ -4,11 +4,11 @@ use iced::{
     alignment::{Horizontal, Vertical},
     border::Radius,
     widget::{
-        text::Shaping,
+        markdown,
         text_input::{focus, Id},
         Button, Checkbox, Column, Container, Row, Scrollable, Text, TextInput,
     },
-    Alignment, Border, Element, Length, Task,
+    Alignment, Border, Element, Length, Task, Theme,
 };
 use iced_aw::{
     menu::{DrawPath, Item, Menu},
@@ -67,6 +67,7 @@ pub enum Message {
     OrderFirstOccurence(bool),
     ClassButtonPressed,
     ClassToggled(bool, WordClass),
+    LinkClicked(markdown::Url),
     Error(String),
 }
 
@@ -85,6 +86,7 @@ pub struct AddTab {
     ignored_from_queue: usize,
     next_word: Option<(String, Vec<Entry>)>,
     next_sentences: Option<Vec<String>>,
+    markdown_items: Option<Vec<markdown::Item>>,
 }
 
 impl AddTab {
@@ -115,7 +117,72 @@ impl AddTab {
                 WordClass::Pronoun,
                 WordClass::Verb,
             ]),
+            markdown_items: None,
         }
+    }
+
+    fn set_entry_markdown_items(&mut self) {
+        let mut entry_string = String::new();
+    
+        for entry in &self.entries {
+            let etymology: Option<&String> = entry.etymology.as_ref();
+            let word = {
+                if let Some(expansion) = &entry.expansion {
+                    expansion
+                } else {
+                    &entry.word
+                }
+            };
+    
+            if !entry.pronunciations.is_empty() {
+                entry_string += "__Pronunciation__\n\n";
+            }
+    
+            for pronunciation in &entry.pronunciations {
+                let tag_string = {
+                    if pronunciation.tags.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" (*{}*)", pronunciation.tags.join(", "))
+                    }
+                };
+    
+                entry_string += &format!("* {}{}\n\n", pronunciation.ipa, tag_string);
+            }
+
+            entry_string += &format!("__{}__\n\n{}\n\n", entry.pos, word);
+            if let Some(etymology) = etymology {
+                entry_string += &format!("{}\n\n", etymology);
+            }
+    
+            for (i, sense) in entry.senses.iter().enumerate() {
+                let tag_string = {
+                    if sense.tags.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" (*{}*)", sense.tags.join(", "))
+                    }
+                };
+    
+                entry_string += &format!("{}. {}{}\n\n", i + 1, sense.sense, tag_string);
+    
+                for example in &sense.examples {
+                    let translation = if let Some(example) = &example.english {
+                        format!(" - {}", example)
+                    } else {
+                        String::new()
+                    };
+    
+                    entry_string += &format!("\t{}{}\n\n", example.text, translation);
+                }
+            }
+        }
+    
+        for sentence in &self.sentences {
+            entry_string += format!("{}\n\n", sentence).as_str();
+        }
+    
+        self.markdown_items = Some(markdown::parse(&entry_string, Theme::TokyoNight.palette()).collect());
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -182,6 +249,7 @@ impl AddTab {
                     self.next_word = Some((with_accent, entries));
                 } else {
                     self.entries = entries;
+                    self.set_entry_markdown_items()
                 }
 
                 if self.russian.is_empty() && preloading {
@@ -259,6 +327,7 @@ impl AddTab {
                     self.next_sentences = Some(sentences);
                 } else {
                     self.sentences = sentences;
+                    self.set_entry_markdown_items();
                 }
 
                 Task::none()
@@ -279,11 +348,13 @@ impl AddTab {
                 if let Some((lemma, entries)) = &self.next_word {
                     lemma.clone_into(&mut self.russian);
                     entries.clone_into(&mut self.entries);
+                    self.set_entry_markdown_items();
                     self.next_word = None;
                 }
 
                 if let Some(sentences) = &self.next_sentences {
                     sentences.clone_into(&mut self.sentences);
+                    self.set_entry_markdown_items();
                     self.next_sentences = None;
                 }
 
@@ -328,6 +399,9 @@ impl AddTab {
                 }
                 Task::none()
             }
+            Message::LinkClicked(_link) => {
+                Task::none()
+            }
         }
     }
 }
@@ -344,89 +418,14 @@ impl Tab for AddTab {
     }
 
     fn content(&self) -> iced::Element<'_, Self::Message> {
-        let mut entry_column = Column::new()
-            .align_x(Alignment::Start)
-            .padding(20)
-            .spacing(16);
+        let entry_markdown = if let Some(markdown_items) = &self.markdown_items {
+            Some(markdown(markdown_items, markdown::Settings::default())
+            .map(Message::LinkClicked))
+        } else { None };
 
-        for entry in &self.entries {
-            let etymology = entry
-                .etymology
-                .as_ref()
-                .map(|etymology| Text::new(etymology).shaping(Shaping::Advanced));
-
-            let word = {
-                if let Some(expansion) = &entry.expansion {
-                    expansion
-                } else {
-                    &entry.word
-                }
-            };
-
-            if !entry.pronunciations.is_empty() {
-                entry_column = entry_column.push(Text::new("Pronunciation"));
-            }
-
-            for pronunciation in &entry.pronunciations {
-                let tag_string = {
-                    if pronunciation.tags.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" ({})", pronunciation.tags.join(", "))
-                    }
-                };
-                entry_column = entry_column.push(
-                    Text::new(format!("  {}{}", pronunciation.ipa, tag_string))
-                        .shaping(Shaping::Advanced),
-                )
-            }
-
-            entry_column = entry_column
-                .push(Text::new(format!("{}, {}", word, entry.pos)).shaping(Shaping::Advanced))
-                .push_maybe(etymology);
-
-            for (i, sense) in entry.senses.iter().enumerate() {
-                let tag_string = {
-                    if sense.tags.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" ({})", sense.tags.join(", "))
-                    }
-                };
-                entry_column = entry_column.push(
-                    Text::new(format!("    {}. {}{}", i + 1, sense.sense, tag_string))
-                        .shaping(Shaping::Advanced),
-                );
-
-                for example in &sense.examples {
-                    let translation = if let Some(example) = &example.english {
-                        format!(" - {}", example)
-                    } else {
-                        String::new()
-                    };
-                    entry_column = entry_column.push(
-                        Text::new(format!("        {}{}", example.text, translation))
-                            .shaping(Shaping::Advanced),
-                    );
-                }
-            }
-        }
-
-        let mut sentence_text = String::new();
-        for sentence in &self.sentences {
-            sentence_text += format!("{}\n\n", sentence).as_str();
-        }
-
-        entry_column = entry_column.push_maybe(if self.sentences.is_empty() {
-            None
-        } else {
-            Some(Text::new(sentence_text))
-        });
-
-        let entry_scrollable = if self.entries.is_empty() {
-            None
-        } else {
-            Some(Scrollable::new(entry_column).width(Length::Fill))
+        let entry_scrollable = match entry_markdown {
+            None => None,
+            Some(entry_markdown) => Some(Scrollable::new(entry_markdown).width(Length::Fill))
         };
 
         let word_class_menu = menu_bar!((
