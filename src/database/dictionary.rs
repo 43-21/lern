@@ -5,7 +5,7 @@ use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use tokio_rusqlite::{params, Connection, Result, Transaction};
 
-use crate::dictionary;
+use crate::dictionary::{self, WordClass};
 use crate::dictionary::entry::{Entry, Example, Form, Pronunciation, Sense};
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -209,15 +209,16 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
         let json: serde_json::Value = serde_json::from_str(&line).unwrap();
 
         let word = json.get("word").unwrap().as_str().unwrap();
-        let pos = json.get("pos").unwrap().as_str().unwrap();
+        let pos = WordClass::from(json.get("pos").unwrap().as_str().unwrap());
         let etymology = json
             .get("etymology_text")
             .map(|etymology| etymology.as_str().unwrap());
 
-        if ![
-            "noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron",
-        ]
-        .contains(&pos)
+        // if ![
+        //     "noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron",
+        // ]
+        // .contains(&pos)
+        if pos == WordClass::Unknown
         {
             continue 'iteration;
         }
@@ -262,13 +263,13 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
         }
 
         if let (Some(etymology), Some(expansion)) = (etymology, expansion) {
-            word_stmt_etymology_expansion.execute([word, pos, etymology, expansion])?;
+            word_stmt_etymology_expansion.execute([word, pos.to_string().as_str(), etymology, expansion])?;
         } else if let Some(etymology) = etymology {
-            word_stmt_etymology.execute([word, pos, etymology])?;
+            word_stmt_etymology.execute([word, pos.to_string().as_str(), etymology])?;
         } else if let Some(expansion) = expansion {
-            word_stmt_expansion.execute([word, pos, expansion])?;
+            word_stmt_expansion.execute([word, pos.to_string().as_str(), expansion])?;
         } else {
-            word_stmt.execute([word, pos])?;
+            word_stmt.execute([word, pos.to_string().as_str()])?;
         }
 
         let word_id = ta.last_insert_rowid();
@@ -442,7 +443,7 @@ pub async fn read_entries(word: String) -> Result<Vec<Entry>> {
             let entry_iter = word_stmt.query_map([word], |row| {
                 let id: i64 = row.get(0)?;
                 let word: String = row.get(1)?;
-                let pos: String = row.get(2)?;
+                let pos: WordClass = row.get(2)?;
                 let etymology: Option<String> = row.get(3)?;
                 let expansion: Option<String> = row.get(4)?;
                 Ok((id, word, pos, etymology, expansion))

@@ -1,7 +1,9 @@
+use super::WordClass;
+
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub word: String,
-    pub pos: String,
+    pub pos: WordClass,
     pub etymology: Option<String>,
     pub expansion: Option<String>,
     pub senses: Vec<Sense>,
