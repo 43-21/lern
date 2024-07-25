@@ -18,17 +18,6 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
             conn.execute("DELETE FROM lemmas WHERE blacklisted = 0", ())?;
         } else {
             conn.execute_batch(
-                "DROP TABLE IF EXISTS sentences;
-                DROP INDEX IF EXISTS sentence_index;
-                CREATE TABLE sentences (
-                    lemma TEXT NOT NULL,
-                    sentence TEXT NOT NULL,
-                    FOREIGN KEY(lemma) REFERENCES lemmas(lemma) ON DELETE CASCADE
-                );
-                CREATE INDEX sentence_index ON sentences(lemma)",
-            )?;
-
-            conn.execute_batch(
                 "DROP TABLE IF EXISTS lemmas;
                 CREATE TABLE lemmas (
                     lemma TEXT PRIMARY KEY,
@@ -39,6 +28,17 @@ pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result
                 );",
             )?;
         }
+
+        conn.execute_batch(
+            "DROP TABLE IF EXISTS sentences;
+            DROP INDEX IF EXISTS sentence_index;
+            CREATE TABLE sentences (
+                lemma TEXT NOT NULL,
+                sentence TEXT NOT NULL,
+                FOREIGN KEY(lemma) REFERENCES lemmas(lemma) ON DELETE CASCADE
+            );
+            CREATE INDEX sentence_index ON sentences(lemma)",
+        )?;
 
         Ok(())
     })
