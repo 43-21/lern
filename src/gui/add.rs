@@ -123,7 +123,7 @@ impl AddTab {
 
     fn set_entry_markdown_items(&mut self) {
         let mut entry_string = String::new();
-    
+
         for entry in &self.entries {
             let etymology: Option<&String> = entry.etymology.as_ref();
             let word = {
@@ -133,11 +133,11 @@ impl AddTab {
                     &entry.word
                 }
             };
-    
+
             if !entry.pronunciations.is_empty() {
                 entry_string += "__Pronunciation__\n\n";
             }
-    
+
             for pronunciation in &entry.pronunciations {
                 let tag_string = {
                     if pronunciation.tags.is_empty() {
@@ -146,7 +146,7 @@ impl AddTab {
                         format!(" (*{}*)", pronunciation.tags.join(", "))
                     }
                 };
-    
+
                 entry_string += &format!("* {}{}\n\n", pronunciation.ipa, tag_string);
             }
 
@@ -155,7 +155,7 @@ impl AddTab {
                 let mut chars = pos.chars();
                 match chars.next() {
                     None => String::new(),
-                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str()
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
                 }
             };
 
@@ -163,7 +163,7 @@ impl AddTab {
             if let Some(etymology) = etymology {
                 entry_string += &format!("{}\n\n", etymology);
             }
-    
+
             for (i, sense) in entry.senses.iter().enumerate() {
                 let tag_string = {
                     if sense.tags.is_empty() {
@@ -172,26 +172,27 @@ impl AddTab {
                         format!(" (*{}*)", sense.tags.join(", "))
                     }
                 };
-    
+
                 entry_string += &format!("{}. {}{}\n\n", i + 1, sense.sense, tag_string);
-    
+
                 for example in &sense.examples {
                     let translation = if let Some(example) = &example.english {
                         format!(" - {}", example)
                     } else {
                         String::new()
                     };
-    
+
                     entry_string += &format!("\t{}{}\n\n", example.text, translation);
                 }
             }
         }
-    
+
         for sentence in &self.sentences {
             entry_string += format!("{}\n\n", sentence).as_str();
         }
-    
-        self.markdown_items = Some(markdown::parse(&entry_string, Theme::TokyoNight.palette()).collect());
+
+        self.markdown_items =
+            Some(markdown::parse(&entry_string, Theme::TokyoNight.palette()).collect());
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -408,9 +409,7 @@ impl AddTab {
                 }
                 Task::none()
             }
-            Message::LinkClicked(_link) => {
-                Task::none()
-            }
+            Message::LinkClicked(_link) => Task::none(),
         }
     }
 }
@@ -427,8 +426,11 @@ impl Tab for AddTab {
     }
 
     fn content(&self) -> iced::Element<'_, Self::Message> {
-        let entry_markdown = self.markdown_items.as_ref().map(|markdown_items| markdown(markdown_items, markdown::Settings::default()).map(Message::LinkClicked));
-        let entry_scrollable = entry_markdown.map(|entry_markdown| Scrollable::new(entry_markdown).width(Length::Fill));
+        let entry_markdown = self.markdown_items.as_ref().map(|markdown_items| {
+            markdown(markdown_items, markdown::Settings::default()).map(Message::LinkClicked)
+        });
+        let entry_scrollable = entry_markdown
+            .map(|entry_markdown| Scrollable::new(entry_markdown).width(Length::Fill));
 
         let word_class_menu = menu_bar!((
             Button::new(Text::new("Include...")).on_press(Message::ClassButtonPressed),
