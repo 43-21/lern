@@ -150,7 +150,16 @@ impl AddTab {
                 entry_string += &format!("* {}{}\n\n", pronunciation.ipa, tag_string);
             }
 
-            entry_string += &format!("__{}__\n\n{}\n\n", entry.pos, word);
+            let uppercase_pos = {
+                let pos = entry.pos.to_string();
+                let mut chars = pos.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str()
+                }
+            };
+
+            entry_string += &format!("__{}__\n\n{}\n\n", uppercase_pos, word);
             if let Some(etymology) = etymology {
                 entry_string += &format!("{}\n\n", etymology);
             }
