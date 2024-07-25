@@ -427,15 +427,8 @@ impl Tab for AddTab {
     }
 
     fn content(&self) -> iced::Element<'_, Self::Message> {
-        let entry_markdown = if let Some(markdown_items) = &self.markdown_items {
-            Some(markdown(markdown_items, markdown::Settings::default())
-            .map(Message::LinkClicked))
-        } else { None };
-
-        let entry_scrollable = match entry_markdown {
-            None => None,
-            Some(entry_markdown) => Some(Scrollable::new(entry_markdown).width(Length::Fill))
-        };
+        let entry_markdown = self.markdown_items.as_ref().map(|markdown_items| markdown(markdown_items, markdown::Settings::default()).map(Message::LinkClicked));
+        let entry_scrollable = entry_markdown.map(|entry_markdown| Scrollable::new(entry_markdown).width(Length::Fill));
 
         let word_class_menu = menu_bar!((
             Button::new(Text::new("Include...")).on_press(Message::ClassButtonPressed),
