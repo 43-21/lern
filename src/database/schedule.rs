@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use tokio::{fs, io::AsyncWriteExt};
-use tokio_rusqlite::{params, Connection, Result};
+use tokio_rusqlite::{params, Connection};
 
-use crate::fsrs::card::Card;
+use crate::{fsrs::card::Card, Result};
 
 use super::queue;
 

@@ -2,12 +2,11 @@ use std::{collections::HashMap, path::PathBuf};
 
 use regex::Regex;
 use tokio::{fs::File, io::AsyncReadExt};
-use tokio_rusqlite::Result;
-
+use crate::Result;
 use crate::database::dictionary;
 
 async fn lemmatize_sentences(text: String) -> Result<()> {
-    let regex = Regex::new(r"[^\s»—][^\r\n\t\v\f.?!…]*[.?!…\n\r\t\v\f]+»*").unwrap();
+    let regex = Regex::new(r"[^\s»—][^\r\n\t\v\f.?!…]*[.?!…\n\r\t\v\f]+»*")?;
     let sentences: Vec<String> = regex
         .find_iter(&text)
         .map(|m| m.as_str().trim().to_owned())
@@ -17,7 +16,7 @@ async fn lemmatize_sentences(text: String) -> Result<()> {
 
     let mut current_word_index = 0;
     for sentence in sentences {
-        let regex = Regex::new(r"[^А-яёЁ]").unwrap();
+        let regex = Regex::new(r"[^А-яёЁ]")?;
         let forms: Vec<String> = regex
             .replace_all(&sentence, " ")
             .split_whitespace()
@@ -40,7 +39,7 @@ pub async fn lemmatize(text: String, add_sentences: bool) -> Result<()> {
     if add_sentences {
         return lemmatize_sentences(text).await;
     }
-    let regex = Regex::new(r"[^А-яёЁ]").unwrap();
+    let regex = Regex::new(r"[^А-яёЁ]")?;
     let forms: Vec<String> = regex
         .replace_all(&text, " ")
         .split_whitespace()
@@ -57,14 +56,14 @@ pub async fn lemmatize(text: String, add_sentences: bool) -> Result<()> {
 }
 
 pub async fn lemmatize_from_file(path: PathBuf, add_sentences: bool) -> Result<()> {
-    let mut file = File::open(path).await.unwrap();
+    let mut file = File::open(path).await?;
     let mut text = String::new();
-    file.read_to_string(&mut text).await.unwrap();
+    file.read_to_string(&mut text).await?;
 
     lemmatize(text, add_sentences).await
 }
 
-pub fn remove_accents(mut word: String) -> String {
+pub fn remove_accents(mut word: String) -> Result<String> {
     let patterns = vec![
         (r"а́", "а"),
         (r"е́", "е"),
@@ -78,9 +77,9 @@ pub fn remove_accents(mut word: String) -> String {
     ];
 
     for (pattern, replacement) in patterns {
-        let re = Regex::new(pattern).unwrap();
+        let re = Regex::new(pattern)?;
         word = re.replace_all(&word, replacement).to_string();
     }
 
-    word
+    Ok(word)
 }

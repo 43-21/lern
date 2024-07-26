@@ -245,9 +245,10 @@ impl AddTab {
             } => {
                 if preloading {
                     let expansion = {
-                        if !entries.is_empty() {
-                            entries.first().unwrap().expansion.clone()
-                        } else {
+                        if let Some(entry) = entries.first() {
+                            entry.expansion.clone()
+                        }
+                        else {
                             None
                         }
                     };

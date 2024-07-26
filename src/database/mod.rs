@@ -1,14 +1,16 @@
 use std::path::PathBuf;
 
 use tokio::fs;
-use tokio_rusqlite::{Connection, Result};
+use tokio_rusqlite::Connection;
+
+use crate::Result;
 
 pub mod dictionary;
 pub mod frequency;
 pub mod queue;
 pub mod schedule;
 
-async fn init(conn: &Connection) -> Result<()> {
+async fn init(conn: &Connection) -> tokio_rusqlite::Result<()> {
     conn.call(|conn| {
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
@@ -23,7 +25,7 @@ async fn init(conn: &Connection) -> Result<()> {
 }
 
 pub async fn create_schedule() -> Result<()> {
-    fs::create_dir_all("./db").await.unwrap();
+    fs::create_dir_all("./db").await?;
 
     let mut conn = Connection::open("./db/database.db").await?;
 
@@ -35,7 +37,7 @@ pub async fn create_schedule() -> Result<()> {
 }
 
 pub async fn create_queue(keep_blacklist: bool) -> Result<()> {
-    fs::create_dir_all("./db").await.unwrap();
+    fs::create_dir_all("./db").await?;
 
     let mut conn = Connection::open("./db/database.db").await?;
 
@@ -47,7 +49,7 @@ pub async fn create_queue(keep_blacklist: bool) -> Result<()> {
 }
 
 pub async fn create_dictionary(wiktionary_path: PathBuf) -> Result<()> {
-    fs::create_dir_all("./db").await.unwrap();
+    fs::create_dir_all("./db").await?;
 
     let conn = Connection::open("./db/database.db").await?;
 
@@ -59,7 +61,7 @@ pub async fn create_dictionary(wiktionary_path: PathBuf) -> Result<()> {
 }
 
 pub async fn create_frequency(frequency_path: PathBuf) -> Result<()> {
-    fs::create_dir_all("./db").await.unwrap();
+    fs::create_dir_all("./db").await?;
 
     let conn = Connection::open("./db/database.db").await?;
 

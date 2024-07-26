@@ -3,12 +3,14 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
-use tokio_rusqlite::{params, Connection, Result, Transaction};
+use tokio_rusqlite::{params, Connection, Transaction};
 
 use crate::dictionary::entry::{Entry, Example, Form, Pronunciation, Sense};
 use crate::dictionary::{self, WordClass};
+use crate::error::Error;
+use crate::Result;
 
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+fn read_lines<P>(filename: P) -> Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
 {
@@ -157,7 +159,7 @@ pub async fn create_tables(path_to_wiktionary: PathBuf) -> Result<()> {
         let start = std::time::Instant::now();
 
         let mut ta = conn.transaction()?;
-        insert_data(&mut ta, path_to_wiktionary)?;
+        insert_data(&mut ta, path_to_wiktionary).map_err(Into::<tokio_rusqlite::Error>::into)?;
         ta.commit()?;
 
         let duration = start.elapsed();
@@ -203,21 +205,24 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
     let mut pronunciation_tag_stmt =
         ta.prepare("INSERT INTO pronunciation_tags (pronunciation_id, tag) VALUES (?1, ?2)")?;
 
-    let lines = read_lines(path_to_wiktionary).unwrap();
+    let lines = read_lines(path_to_wiktionary)?;
 
-    'iteration: for line in lines.map_while(std::io::Result::ok) {
-        let json: serde_json::Value = serde_json::from_str(&line).unwrap();
+    'iteration: for (i, line) in lines.map_while(std::io::Result::ok).enumerate() {
+        let json: serde_json::Value = serde_json::from_str(&line)?;
 
-        let word = json.get("word").unwrap().as_str().unwrap();
-        let pos = WordClass::from(json.get("pos").unwrap().as_str().unwrap());
-        let etymology = json
-            .get("etymology_text")
-            .map(|etymology| etymology.as_str().unwrap());
+        let word = json.get("word").ok_or(Error::GetValueFailed(json.clone(), i))?;
+        let word = word.as_str().ok_or(Error::ValueConversionFailed(word.to_owned(), i))?;
+        
+        let pos_value = json.get("pos").ok_or(Error::GetValueFailed(json.clone(), i))?;
+        let pos_str = pos_value.as_str().ok_or(Error::ValueConversionFailed(pos_value.to_owned(), i))?;
+        let pos = WordClass::from(pos_str);
 
-        // if ![
-        //     "noun", "verb", "adj", "adv", "det", "particle", "intj", "conj", "prep", "pron",
-        // ]
-        // .contains(&pos)
+        let etymology = match json.get("etymology_text") {
+            Some(value) => Some(value.as_str().ok_or(Error::ValueConversionFailed(value.to_owned(), i))?),
+            None => None,
+        };
+
+
         if pos == WordClass::Unknown {
             continue 'iteration;
         }
@@ -225,20 +230,23 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
         let head_templates = json.get("head_templates");
         let expansion = {
             if let Some(head_templates) = head_templates {
-                head_templates
+                let head_templates = head_templates
                     .as_array()
-                    .unwrap()
+                    .ok_or(Error::ValueConversionFailed(head_templates.to_owned(), i))?
                     .first()
-                    .unwrap()
+                    .ok_or(Error::EmptyJSONArray(i))?;
+                
+                head_templates
                     .get("expansion")
-                    .unwrap()
+                    .ok_or(Error::GetValueFailed(head_templates.to_owned(), i))?
                     .as_str()
             } else {
                 None
             }
         };
 
-        let json_senses = json.get("senses").unwrap().as_array().unwrap();
+        let json_senses = json.get("senses").ok_or(Error::GetValueFailed(json.clone(), i))?;
+        let json_senses = json_senses.as_array().ok_or(Error::ValueConversionFailed(json_senses.to_owned(), i))?;
         let mut senses = Vec::new();
 
         'senses: for sense in json_senses {
@@ -247,8 +255,8 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
             }
 
             if let Some(tags) = sense.get("tags") {
-                for tag in tags.as_array().unwrap() {
-                    if tag.as_str().unwrap() == "form-of" {
+                for tag in tags.as_array().ok_or(Error::ValueConversionFailed(tags.to_owned(), i))? {
+                    if tag.as_str().ok_or(Error::ValueConversionFailed(tag.to_owned(), i))? == "form-of" {
                         continue 'senses;
                     }
                 }
@@ -278,11 +286,18 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
         let word_id = ta.last_insert_rowid();
 
-        let senses = json.get("senses").unwrap().as_array().unwrap();
+        let senses = json.get("senses").ok_or(Error::GetValueFailed(json.clone(), i))?;
+        let senses = senses.as_array().ok_or(Error::ValueConversionFailed(senses.to_owned(), i))?;
         for (i, sense) in senses.iter().enumerate() {
-            let gloss = sense
-                .get("glosses")
-                .map(|glosses| glosses.as_array().unwrap()[0].as_str().unwrap());
+            let glosses = sense
+                .get("glosses");
+            let gloss = if let Some(glosses) = glosses {
+                let glosses = glosses.as_array().ok_or(Error::ValueConversionFailed(glosses.to_owned(), i))?;
+                let gloss = glosses.first().ok_or(Error::EmptyJSONArray(i))?;
+                Some(gloss.as_str().ok_or(Error::ValueConversionFailed(gloss.to_owned(), i))?)
+            } else {
+                None
+            };
 
             if let Some(gloss) = gloss {
                 sense_stmt_gloss.execute(params![word_id, gloss, i])?;
@@ -294,31 +309,35 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
 
             let tags = {
                 if let Some(tags) = sense.get("tags") {
-                    tags.as_array().unwrap().to_owned()
+                    tags.as_array().ok_or(Error::ValueConversionFailed(tags.to_owned(), i))?.to_owned()
                 } else {
                     Vec::<Value>::new()
                 }
             };
 
             for tag in tags {
-                let tag = tag.as_str().unwrap();
+                let tag = tag.as_str().ok_or(Error::ValueConversionFailed(tag.to_owned(), i))?;
 
                 sense_tag_stmt.execute(params![sense_id, tag])?;
             }
 
             let examples = {
                 if let Some(examples) = sense.get("examples") {
-                    examples.as_array().unwrap().to_owned()
+                    examples.as_array().ok_or(Error::ValueConversionFailed(examples.to_owned(), i))?.to_owned()
                 } else {
                     Vec::<Value>::new()
                 }
             };
 
             for example in examples {
-                let text = example.get("text").unwrap().as_str().unwrap();
-                let english = example
-                    .get("english")
-                    .map(|english| english.as_str().unwrap());
+                let text = example.get("text").ok_or(Error::GetValueFailed(example.to_owned(), i))?;
+                let text = text.as_str().ok_or(Error::ValueConversionFailed(text.to_owned(), i))?;
+
+                let english = example.get("english");
+                let english = match english {
+                    Some(english) => Some(english.as_str().ok_or(Error::ValueConversionFailed(english.to_owned(), i))?),
+                    None => None,
+                };
 
                 if let Some(english) = english {
                     example_stmt_english.execute(params![sense_id, text, english])?;
@@ -328,10 +347,10 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
             }
 
             if let Some(synonyms) = sense.get("synonyms") {
-                let synonyms = synonyms.as_array().unwrap();
+                let synonyms = synonyms.as_array().ok_or(Error::ValueConversionFailed(synonyms.to_owned(), i))?;
 
                 for synonym in synonyms {
-                    let synonym = synonym.get("word").unwrap().as_str().unwrap();
+                    let synonym = synonym.as_str().ok_or(Error::ValueConversionFailed(synonym.to_owned(), i))?;
 
                     synonym_stmt.execute([synonym])?;
                     let synonym_id = ta.last_insert_rowid();
@@ -341,16 +360,18 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
         }
 
         if let Some(forms) = json.get("forms") {
-            let forms = forms.as_array().unwrap();
+            let forms = forms.as_array().ok_or(Error::ValueConversionFailed(forms.to_owned(), i))?;
 
             'forms: for form in forms {
-                let word = form.get("form").unwrap().as_str().unwrap();
+                let word = form.get("form").ok_or(Error::GetValueFailed(form.to_owned(), i))?;
+                let word = word.as_str().ok_or(Error::ValueConversionFailed(word.to_owned(), i))?;
 
                 let source = form.get("source");
                 if source.is_none() {
                     continue 'forms;
                 }
-                let source = source.unwrap().as_str().unwrap();
+                let source = source.unwrap();
+                let source = source.as_str().ok_or(Error::ValueConversionFailed(source.to_owned(), i))?;
                 if source != "declension" && source != "conjugation" {
                     continue 'forms;
                 }
@@ -359,38 +380,39 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
                 if tags.is_none() {
                     continue 'forms;
                 }
-                let tags = tags.unwrap().as_array().unwrap();
+                let tags = tags.unwrap();
+                let tags = tags.as_array().ok_or(Error::ValueConversionFailed(tags.to_owned(), i))?;
                 for tag in tags {
-                    match tag.as_str().unwrap() {
+                    match tag.as_str().ok_or(Error::ValueConversionFailed(tag.to_owned(), i))? {
                         "inflection-template" | "table-tags" | "class" => continue 'forms,
                         _ => (),
                     }
                 }
 
-                let normalized = dictionary::remove_accents(word.to_owned());
+                let normalized = dictionary::remove_accents(word.to_owned())?;
 
                 form_stmt.execute(params![word, word_id, &normalized])?;
                 let form_id = ta.last_insert_rowid();
 
                 for tag in tags {
-                    let tag = tag.as_str().unwrap();
+                    let tag = tag.as_str().ok_or(Error::ValueConversionFailed(tag.to_owned(), i))?;
                     form_tag_stmt.execute(params![form_id, tag])?;
                 }
             }
         }
 
         if let Some(sounds) = json.get("sounds") {
-            let sounds = sounds.as_array().unwrap();
+            let sounds = sounds.as_array().ok_or(Error::ValueConversionFailed(sounds.to_owned(), i))?;
             for sound in sounds {
                 if let Some(ipa) = sound.get("ipa") {
-                    let ipa = ipa.as_str().unwrap();
+                    let ipa = ipa.as_str().ok_or(Error::ValueConversionFailed(ipa.to_owned(), i))?;
                     pronunciation_stmt.execute(params![word_id, ipa])?;
                     let pronunciation_id = ta.last_insert_rowid();
 
                     if let Some(tags) = sound.get("tags") {
-                        let tags = tags.as_array().unwrap();
+                        let tags = tags.as_array().ok_or(Error::ValueConversionFailed(tags.to_owned(), i))?;
                         for tag in tags {
-                            let tag = tag.as_str().unwrap();
+                            let tag = tag.as_str().ok_or(Error::ValueConversionFailed(tag.to_owned(), i))?;
                             pronunciation_tag_stmt.execute(params![pronunciation_id, tag])?;
                         }
                     }
@@ -634,7 +656,9 @@ pub async fn lemmatize_sentences(sentences: Vec<(String, Vec<(String, usize)>)>)
 
         Ok(())
     })
-    .await
+    .await?;
+
+    Ok(())
 }
 
 pub async fn lemmatize(forms: HashMap<String, (usize, usize)>) -> Result<()> {
@@ -667,5 +691,7 @@ pub async fn lemmatize(forms: HashMap<String, (usize, usize)>) -> Result<()> {
 
         Ok(())
     })
-    .await
+    .await?;
+
+    Ok(())
 }

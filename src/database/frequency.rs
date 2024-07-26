@@ -2,7 +2,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-use tokio_rusqlite::{params, Connection, Result};
+use crate::Result;
+
+use tokio_rusqlite::{params, Connection};
 
 pub async fn create_table<P: AsRef<Path>>(path_to_frequencies: P) -> Result<()> {
     let conn = Connection::open("./db/database.db").await?;
@@ -38,9 +40,9 @@ pub async fn create_table<P: AsRef<Path>>(path_to_frequencies: P) -> Result<()> 
 }
 
 async fn insert_frequencies<P: AsRef<Path>>(conn: &Connection, file: P) -> Result<()> {
-    let mut file = File::open(file).unwrap();
+    let mut file = File::open(file)?;
     let mut buffer = String::new();
-    file.read_to_string(&mut buffer).unwrap();
+    file.read_to_string(&mut buffer)?;
 
     conn.call(move |conn| {
         let frequencies = buffer.split_whitespace();
@@ -54,7 +56,7 @@ async fn insert_frequencies<P: AsRef<Path>>(conn: &Connection, file: P) -> Resul
             let word_iter = select_stmt.query_map(params![word], |row| row.get(0))?;
 
             for word_id in word_iter {
-                let word_id: i64 = word_id.unwrap();
+                let word_id: i64 = word_id?;
                 word_ids.push((word_id, i));
             }
         }

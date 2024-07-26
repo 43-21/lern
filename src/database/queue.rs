@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use tokio_rusqlite::{Connection, Result};
+use tokio_rusqlite::Connection;
 
-use crate::dictionary::{self, WordClass};
+use crate::{dictionary::{self, WordClass}, Result};
 
 pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result<()> {
     conn.call(move |conn| {
@@ -181,10 +181,10 @@ pub async fn get_lemmas_queue(
     Ok(queue)
 }
 
-pub async fn blacklist_lemma(lemma: String) -> Result<()> {
+pub async fn blacklist_lemma(lemma: String) -> tokio_rusqlite::Result<()> {
     let conn = Connection::open("./db/database.db").await?;
 
-    let lemma = dictionary::remove_accents(lemma);
+    let lemma = dictionary::remove_accents(lemma)?;
 
     conn.call(move |conn| {
         conn.execute(
@@ -199,7 +199,7 @@ pub async fn blacklist_lemma(lemma: String) -> Result<()> {
     .await
 }
 
-pub async fn get_sentences(lemma: String) -> Result<Vec<String>> {
+pub async fn get_sentences(lemma: String) -> tokio_rusqlite::Result<Vec<String>> {
     let conn = Connection::open("./db/database.db").await?;
 
     conn.call(move |conn| {
