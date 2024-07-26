@@ -1,9 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use crate::database::dictionary;
+use crate::Result;
 use regex::Regex;
 use tokio::{fs::File, io::AsyncReadExt};
-use crate::Result;
-use crate::database::dictionary;
 
 async fn lemmatize_sentences(text: String) -> Result<()> {
     let regex = Regex::new(r"[^\s»—][^\r\n\t\v\f.?!…]*[.?!…\n\r\t\v\f]+»*")?;

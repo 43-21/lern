@@ -24,11 +24,10 @@ impl From<tokio_rusqlite::Error> for Error {
             tokio_rusqlite::Error::Other(error) => {
                 if error.downcast_ref::<Self>().is_some() {
                     *error.downcast().unwrap()
-                }
-                else {
+                } else {
                     Self::TokioRusqliteFailed(tokio_rusqlite::Error::Other(error))
                 }
-            },
+            }
             _ => Self::TokioRusqliteFailed(error),
         }
     }

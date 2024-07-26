@@ -247,8 +247,7 @@ impl AddTab {
                     let expansion = {
                         if let Some(entry) = entries.first() {
                             entry.expansion.clone()
-                        }
-                        else {
+                        } else {
                             None
                         }
                     };

@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use tokio_rusqlite::Connection;
 
-use crate::{dictionary::{self, WordClass}, Result};
+use crate::{
+    dictionary::{self, WordClass},
+    Result,
+};
 
 pub async fn create_table(conn: &mut Connection, keep_blacklist: bool) -> Result<()> {
     conn.call(move |conn| {
