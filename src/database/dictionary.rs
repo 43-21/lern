@@ -423,10 +423,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
                     .ok_or(Error::ValueConversionFailed(word.to_owned(), i))?;
 
                 let source = form.get("source");
-                if source.is_none() {
-                    continue 'forms;
-                }
-                let source = source.unwrap();
+                let Some(source) = source else { continue 'forms };
                 let source = source
                     .as_str()
                     .ok_or(Error::ValueConversionFailed(source.to_owned(), i))?;
@@ -435,10 +432,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
                 }
 
                 let tags = form.get("tags");
-                if tags.is_none() {
-                    continue 'forms;
-                }
-                let tags = tags.unwrap();
+                let Some(tags) = tags else { continue 'forms };
                 let tags = tags
                     .as_array()
                     .ok_or(Error::ValueConversionFailed(tags.to_owned(), i))?;

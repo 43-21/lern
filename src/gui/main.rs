@@ -31,8 +31,8 @@ pub enum Message {
     FrequencyFileSet { path: Option<PathBuf> },
     CreateSchedule,
     CreateQueue,
-    CreateDictionary,
-    CreateFrequency,
+    CreateDictionary(PathBuf),
+    CreateFrequency(PathBuf),
     ScheduleCreated,
     QueueCreated,
     DictionaryCreated,
@@ -105,15 +105,15 @@ impl MainTab {
                     Ok(()) => Message::QueueCreated,
                 },
             ),
-            Message::CreateDictionary => Task::perform(
-                database::create_dictionary(self.wiktionary_path.clone().unwrap()),
+            Message::CreateDictionary(path) => Task::perform(
+                database::create_dictionary(path),
                 |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::DictionaryCreated,
                 },
             ),
-            Message::CreateFrequency => Task::perform(
-                database::create_frequency(self.frequency_path.clone().unwrap()),
+            Message::CreateFrequency(path) => Task::perform(
+                database::create_frequency(path),
                 |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::FrequencyCreated,
@@ -177,20 +177,12 @@ impl Tab for MainTab {
     }
 
     fn content(&self) -> iced::Element<'_, Self::Message> {
-        let frequency_msg = {
-            if self.frequency_path.is_some() && self.dictionary {
-                Some(Message::CreateFrequency)
-            } else {
-                None
-            }
+        let frequency_msg = if self.dictionary {
+            self.frequency_path.clone().map(Message::CreateFrequency)
+        } else {
+            None
         };
-        let dictionary_msg: Option<Message> = {
-            if self.wiktionary_path.is_some() {
-                Some(Message::CreateDictionary)
-            } else {
-                None
-            }
-        };
+        let dictionary_msg: Option<Message> = self.wiktionary_path.clone().map(Message::CreateDictionary);
 
         let dictionary = {
             if self.dictionary {
