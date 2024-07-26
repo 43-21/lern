@@ -619,7 +619,7 @@ pub async fn lemmatize_sentences(sentences: Vec<(String, Vec<(String, usize)>)>)
             let size = forms.len();
             for (form, position) in forms {
                 insert_lemmas_stmt.execute(params![max_first_occurence + position, form])?;
-                if (5..25).contains(&size) {
+                if (3..20).contains(&size) {
                     insert_sentence_stmt.execute(params![sentence, form])?;
                 }
             }
