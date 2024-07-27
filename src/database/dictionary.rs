@@ -398,6 +398,7 @@ fn insert_data(ta: &mut Transaction, path_to_wiktionary: PathBuf) -> Result<()> 
                     .ok_or(Error::ValueConversionFailed(synonyms.to_owned(), i))?;
 
                 for synonym in synonyms {
+                    let synonym = synonym.get("word").ok_or(Error::GetValueFailed(synonym.to_owned(), i))?;
                     let synonym = synonym
                         .as_str()
                         .ok_or(Error::ValueConversionFailed(synonym.to_owned(), i))?;
