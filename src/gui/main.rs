@@ -43,6 +43,12 @@ pub enum Message {
     KeepBlacklist(bool),
 }
 
+pub enum Action {
+    None,
+    Run(Task<Message>),
+    Add(Task<super::AddMessage>),
+}
+
 impl MainTab {
     pub fn new() -> MainTab {
         MainTab {
@@ -56,13 +62,13 @@ impl MainTab {
         }
     }
 
-    pub fn update(&mut self, message: Message) -> Task<Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::Error(e) => {
                 println!("{e}");
-                Task::none()
+                Action::None
             }
-            Message::SetWiktionaryFile => Task::perform(
+            Message::SetWiktionaryFile => Action::Run(Task::perform(
                 AsyncFileDialog::new()
                     .set_title("Wiktionary")
                     .add_filter("JSON Lines", &["jsonl"])
@@ -70,8 +76,8 @@ impl MainTab {
                 |file_handle| Message::WiktionaryFileSet {
                     path: file_handle.map(|file_handle| file_handle.into()),
                 },
-            ),
-            Message::SetFrequencyFile => Task::perform(
+            )),
+            Message::SetFrequencyFile => Action::Run(Task::perform(
                 AsyncFileDialog::new()
                     .set_title("Frequency")
                     .add_filter("text", &["txt"])
@@ -79,63 +85,63 @@ impl MainTab {
                 |file_handle| Message::FrequencyFileSet {
                     path: file_handle.map(|file_handle| file_handle.into()),
                 },
-            ),
+            )),
             Message::WiktionaryFileSet { path } => {
                 if path.is_some() {
                     self.wiktionary_path = path;
                 }
-                Task::none()
+                Action::None
             }
             Message::FrequencyFileSet { path } => {
                 if path.is_some() {
                     self.frequency_path = path;
                 }
-                Task::none()
+                Action::None
             }
             Message::CreateSchedule => {
-                Task::perform(database::create_schedule(), |res| match res {
+                Action::Run(Task::perform(database::create_schedule(), |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::ScheduleCreated,
-                })
+                }))
             }
-            Message::CreateQueue => Task::perform(
+            Message::CreateQueue => Action::Run(Task::perform(
                 database::create_queue(self.keep_blacklist),
                 |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::QueueCreated,
                 },
-            ),
-            Message::CreateDictionary(path) => Task::perform(
+            )),
+            Message::CreateDictionary(path) => Action::Run(Task::perform(
                 database::create_dictionary(path),
                 |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::DictionaryCreated,
                 },
-            ),
-            Message::CreateFrequency(path) => Task::perform(
+            )),
+            Message::CreateFrequency(path) => Action::Run(Task::perform(
                 database::create_frequency(path),
                 |res| match res {
                     Err(e) => Message::Error(e.to_string()),
                     Ok(()) => Message::FrequencyCreated,
                 },
-            ),
+            )),
             Message::ScheduleCreated => {
                 self.schedule = true;
-                Task::none()
+                Action::None
             }
             Message::DictionaryCreated => {
                 self.dictionary = true;
-                Task::none()
+                Action::None
             }
             Message::QueueCreated => {
                 self.queue = true;
-                Task::none()
+                Action::None
             }
             Message::FrequencyCreated => {
                 self.frequency = true;
-                Task::none()
+                Action::None
             }
-            Message::SetExportLocation => Task::perform(
+            Message::SetExportLocation => Action::Run(Task::perform(
                 AsyncFileDialog::new()
                     .set_title("Export")
                     .add_filter("text", &["txt"])
@@ -145,21 +151,21 @@ impl MainTab {
                 |file_handle| Message::Export {
                     path: file_handle.map(|file_handle| file_handle.into()),
                 },
-            ),
+            )),
             Message::Export { path } => match path {
-                Some(path) => Task::perform(schedule::export(path), |res| match res {
+                Some(path) => Action::Run(Task::perform(schedule::export(path), |res| match res {
                     Ok(()) => Message::Exported,
                     Err(e) => Message::Error(e.to_string()),
-                }),
-                None => Task::none(),
+                })),
+                None => Action::None,
             },
             Message::Exported => {
                 println!("exported!");
-                Task::none()
+                Action::None
             }
             Message::KeepBlacklist(keep_blacklist) => {
                 self.keep_blacklist = keep_blacklist;
-                Task::none()
+                Action::None
             }
         }
     }

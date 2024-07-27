@@ -28,6 +28,12 @@ pub enum Message {
     Error(String),
 }
 
+pub enum Action {
+    None,
+    Run(Task<Message>),
+    Add(Task<super::AddMessage>),
+}
+
 impl LemmatizeTab {
     pub fn new() -> LemmatizeTab {
         LemmatizeTab {
@@ -37,24 +43,24 @@ impl LemmatizeTab {
         }
     }
 
-    pub fn update(&mut self, message: Message) -> Task<Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::ActionPerformed(action) => {
                 self.is_dirty = self.is_dirty || action.is_edit();
                 self.content.perform(action);
-                Task::none()
+                Action::None
             }
             Message::Lemmatize => {
                 let text = self.content.text();
                 self.content = text_editor::Content::new();
                 self.is_dirty = false;
 
-                Task::future(lemmatize(text, self.add_sentences)).then(|result| match result {
+                Action::Run(Task::future(lemmatize(text, self.add_sentences)).then(|result| match result {
                     Ok(()) => Task::none(),
                     Err(e) => Task::done(Message::Error(e.to_string())),
-                })
+                }))
             }
-            Message::FromFile => Task::perform(
+            Message::FromFile => Action::Run(Task::perform(
                 AsyncFileDialog::new()
                     .set_title("From file")
                     .add_filter("text", &["txt", "srt"])
@@ -62,26 +68,26 @@ impl LemmatizeTab {
                 |file_handle| Message::FileSet {
                     path: file_handle.map(|file_handle| file_handle.into()),
                 },
-            ),
+            )),
             Message::FileSet { path } => {
                 if let Some(path) = path {
-                    Task::future(lemmatize_from_file(path, self.add_sentences)).then(|result| {
+                    Action::Run(Task::future(lemmatize_from_file(path, self.add_sentences)).then(|result| {
                         match result {
                             Ok(()) => Task::none(),
                             Err(e) => Task::done(Message::Error(e.to_string())),
                         }
-                    })
+                    }))
                 } else {
-                    Task::none()
+                    Action::None
                 }
             }
             Message::AddSentences(value) => {
                 self.add_sentences = value;
-                Task::none()
+                Action::None
             }
             Message::Error(e) => {
                 println!("{e}");
-                Task::none()
+                Action::None
             }
         }
     }

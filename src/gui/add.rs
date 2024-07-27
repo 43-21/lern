@@ -71,6 +71,11 @@ pub enum Message {
     Error(String),
 }
 
+pub enum Action {
+    None,
+    Run(Task<Message>),
+}
+
 pub struct AddTab {
     russian: String,
     native: String,
@@ -195,37 +200,37 @@ impl AddTab {
             Some(markdown::parse(&entry_string, Theme::TokyoNight.palette()).collect());
     }
 
-    pub fn update(&mut self, message: Message) -> Task<Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::RussianChanged(value) => {
                 self.russian = value;
                 self.version += 1;
                 let version = self.version;
-                Task::perform(
+                Action::Run(Task::perform(
                     async move {
                         tokio::time::sleep(tokio::time::Duration::from_millis(75)).await;
                         version
                     },
                     |version| Message::DictionaryTimer { version },
-                )
+                ))
             }
             Message::NativeChanged(value) => {
                 self.native = value;
-                Task::none()
+                Action::None
             }
             Message::Add => {
                 if !self.native.is_empty() && !self.russian.is_empty() {
-                    Task::perform(
+                    Action::Run(Task::perform(
                         schedule::insert_card(Card::new(&self.native, &self.russian)),
                         |_| Message::LoadNext,
-                    )
+                    ))
                 } else {
-                    Task::none()
+                    Action::None
                 }
             }
             Message::DictionaryTimer { version } => {
                 if version == self.version {
-                    Task::batch(vec![
+                    Action::Run(Task::batch(vec![
                         Task::done(Message::ReadEntries {
                             preloading: false,
                             word: self.russian.clone(),
@@ -234,9 +239,9 @@ impl AddTab {
                             preloading: false,
                             word: self.russian.clone(),
                         }),
-                    ])
+                    ]))
                 } else {
-                    Task::none()
+                    Action::None
                 }
             }
             Message::EntriesRead {
@@ -263,14 +268,14 @@ impl AddTab {
                 }
 
                 if self.russian.is_empty() && preloading {
-                    Task::done(Message::LoadNext)
+                    Action::Run(Task::done(Message::LoadNext))
                 } else {
-                    Task::none()
+                    Action::None
                 }
             }
             Message::ReadFromQueue => {
                 if self.from_queue {
-                    Task::future(queue::get_lemmas_queue(
+                    Action::Run(Task::future(queue::get_lemmas_queue(
                         self.ignored_from_queue,
                         self.order_frequency,
                         self.order_general_frequency,
@@ -280,9 +285,9 @@ impl AddTab {
                     .then(move |lemmas| match lemmas {
                         Ok(lemmas) => Task::done(Message::QueueRead { lemmas }),
                         Err(e) => Task::done(Message::Error(e.to_string())),
-                    })
+                    }))
                 } else {
-                    Task::none()
+                    Action::None
                 }
             }
             Message::QueueRead { lemmas } => {
@@ -291,25 +296,25 @@ impl AddTab {
                     self.from_queue = false;
                 }
                 if self.next_word.is_none() {
-                    Task::done(Message::Preload)
+                    Action::Run(Task::done(Message::Preload))
                 } else {
-                    Task::none()
+                    Action::None
                 }
             }
             Message::Blacklist => {
-                Task::perform(queue::blacklist_lemma(self.russian.clone()), |_| {
+                Action::Run(Task::perform(queue::blacklist_lemma(self.russian.clone()), |_| {
                     Message::LoadNext
-                })
+                }))
             }
             Message::Ignore => {
                 self.ignored_from_queue += 1;
-                Task::done(Message::LoadNext)
+                Action::Run(Task::done(Message::LoadNext))
             }
             Message::Error(message) => {
                 println!("{message}");
-                Task::none()
+                Action::None
             }
-            Message::ReadEntries { preloading, word } => Task::perform(
+            Message::ReadEntries { preloading, word } => Action::Run(Task::perform(
                 dictionary::read_entries(word),
                 move |entries| match entries {
                     Ok(entries) => Message::EntriesRead {
@@ -318,8 +323,8 @@ impl AddTab {
                     },
                     Err(e) => Message::Error(e.to_string()),
                 },
-            ),
-            Message::ReadSentences { preloading, word } => Task::perform(
+            )),
+            Message::ReadSentences { preloading, word } => Action::Run(Task::perform(
                 queue::get_sentences(word),
                 move |sentences| match sentences {
                     Ok(sentences) => Message::SentencesRead {
@@ -328,7 +333,7 @@ impl AddTab {
                     },
                     Err(e) => Message::Error(e.to_string()),
                 },
-            ),
+            )),
             Message::SentencesRead {
                 preloading,
                 sentences,
@@ -340,11 +345,11 @@ impl AddTab {
                     self.set_entry_markdown_items();
                 }
 
-                Task::none()
+                Action::None
             }
             Message::FromQueue(value) => {
                 self.from_queue = value;
-                Task::done(Message::LoadNext)
+                Action::Run(Task::done(Message::LoadNext))
             }
             Message::LoadNext => {
                 self.version = 0;
@@ -352,7 +357,7 @@ impl AddTab {
                 self.russian = String::new();
 
                 if !self.from_queue {
-                    return Task::none();
+                    return Action::None;
                 }
 
                 if let Some((lemma, entries)) = &self.next_word {
@@ -368,14 +373,14 @@ impl AddTab {
                     self.next_sentences = None;
                 }
 
-                Task::batch([Task::done(Message::Preload), focus(INPUT_ID.clone())])
+                Action::Run(Task::batch([Task::done(Message::Preload), focus(INPUT_ID.clone())]))
             }
             Message::Preload => {
                 if self.lemmas.is_empty() {
-                    Task::done(Message::ReadFromQueue)
+                    Action::Run(Task::done(Message::ReadFromQueue))
                 } else {
                     let word = self.lemmas.remove(0);
-                    Task::batch(vec![
+                    Action::Run(Task::batch(vec![
                         Task::done(Message::ReadEntries {
                             preloading: true,
                             word: word.clone(),
@@ -384,32 +389,32 @@ impl AddTab {
                             preloading: true,
                             word: word.clone(),
                         }),
-                    ])
+                    ]))
                 }
             }
-            Message::OrderButtonPressed => Task::none(),
+            Message::OrderButtonPressed => Action::None,
             Message::OrderFrequency(value) => {
                 self.order_frequency = value;
-                Task::none()
+                Action::None
             }
             Message::OrderGeneralFrequency(value) => {
                 self.order_general_frequency = value;
-                Task::none()
+                Action::None
             }
             Message::OrderFirstOccurence(value) => {
                 self.order_first_occurence = value;
-                Task::none()
+                Action::None
             }
-            Message::ClassButtonPressed => Task::none(),
+            Message::ClassButtonPressed => Action::None,
             Message::ClassToggled(value, class) => {
                 if value {
                     self.word_classes.insert(class);
                 } else {
                     self.word_classes.remove(&class);
                 }
-                Task::none()
+                Action::None
             }
-            Message::LinkClicked(_link) => Task::none(),
+            Message::LinkClicked(_link) => Action::None,
         }
     }
 }

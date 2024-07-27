@@ -53,16 +53,24 @@ impl App {
                 Task::none()
             }
             Message::Add(message) => {
-                let command = self.add_tab.update(message);
-                command.map(Message::Add)
+                match self.add_tab.update(message) {
+                    add::Action::None => Task::none(),
+                    add::Action::Run(task) => task.map(Message::Add),
+                }
             }
             Message::Lemmatize(message) => {
-                let command = self.lemmatize_tab.update(message);
-                command.map(Message::Lemmatize)
+                match self.lemmatize_tab.update(message) {
+                    lemmatize::Action::None => Task::none(),
+                    lemmatize::Action::Run(task) => task.map(Message::Lemmatize),
+                    lemmatize::Action::Add(task) => task.map(Message::Add),
+                }
             }
             Message::Main(message) => {
-                let command = self.main_tab.update(message);
-                command.map(Message::Main)
+                match self.main_tab.update(message) {
+                    main::Action::None => Task::none(),
+                    main::Action::Run(task) => task.map(Message::Main),
+                    main::Action::Add(task) => task.map(Message::Add),
+                }
             }
         }
     }
