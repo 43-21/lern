@@ -25,6 +25,7 @@ pub enum Message {
     FromFile,
     FileSet { path: Option<PathBuf> },
     AddSentences(bool),
+    Lemmatized,
     Error(String),
 }
 
@@ -56,7 +57,7 @@ impl LemmatizeTab {
                 self.is_dirty = false;
 
                 Action::Run(Task::future(lemmatize(text, self.add_sentences)).then(|result| match result {
-                    Ok(()) => Task::none(),
+                    Ok(()) => Task::done(Message::Lemmatized),
                     Err(e) => Task::done(Message::Error(e.to_string())),
                 }))
             }
@@ -84,6 +85,9 @@ impl LemmatizeTab {
             Message::AddSentences(value) => {
                 self.add_sentences = value;
                 Action::None
+            }
+            Message::Lemmatized => {
+                Action::Add(Task::done(super::AddMessage::QueueInsertion))
             }
             Message::Error(e) => {
                 println!("{e}");

@@ -135,7 +135,7 @@ impl MainTab {
             }
             Message::QueueCreated => {
                 self.queue = true;
-                Action::None
+                Action::Add(Task::done(super::AddMessage::QueueEmpty))
             }
             Message::FrequencyCreated => {
                 self.frequency = true;

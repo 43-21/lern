@@ -68,6 +68,8 @@ pub enum Message {
     ClassButtonPressed,
     ClassToggled(bool, WordClass),
     LinkClicked(markdown::Url),
+    QueueInsertion,
+    QueueEmpty,
     Error(String),
 }
 
@@ -84,6 +86,7 @@ pub struct AddTab {
     sentences: Vec<String>,
     lemmas: Vec<String>,
     from_queue: bool,
+    queue_available: bool,
     order_frequency: bool,
     order_general_frequency: bool,
     order_first_occurence: bool,
@@ -104,6 +107,7 @@ impl AddTab {
             sentences: Vec::new(),
             lemmas: Vec::new(),
             from_queue: false,
+            queue_available: false,
             ignored_from_queue: 0,
             next_word: None,
             next_sentences: None,
@@ -415,6 +419,16 @@ impl AddTab {
                 Action::None
             }
             Message::LinkClicked(_link) => Action::None,
+            Message::QueueInsertion => {
+                self.queue_available = true;
+                Action::None
+            }
+            Message::QueueEmpty => {
+                self.queue_available = false;
+                self.from_queue = false;
+                self.lemmas = Vec::new();
+                Action::None
+            }
         }
     }
 }
@@ -545,10 +559,16 @@ impl Tab for AddTab {
             ..menu_bar::primary(theme, status)
         });
 
+        let from_queue_msg = if self.queue_available {
+            Some(Message::FromQueue)
+        } else {
+            None
+        };
+
         let settings_row: Row<Message> = Row::new()
             .padding(20)
             .spacing(16)
-            .push(Checkbox::new("Add from queue", self.from_queue).on_toggle(Message::FromQueue))
+            .push(Checkbox::new("Add from queue", self.from_queue).on_toggle_maybe(from_queue_msg))
             .push(order_menu)
             .push(word_class_menu);
 
