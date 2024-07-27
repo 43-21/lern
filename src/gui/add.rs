@@ -86,7 +86,7 @@ pub struct AddTab {
     sentences: Vec<String>,
     lemmas: Vec<String>,
     from_queue: bool,
-    queue_available: bool,
+    pub queue_available: bool,
     order_frequency: bool,
     order_general_frequency: bool,
     order_first_occurence: bool,

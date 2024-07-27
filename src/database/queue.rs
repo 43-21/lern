@@ -220,3 +220,18 @@ pub async fn get_sentences(lemma: String) -> tokio_rusqlite::Result<Vec<String>>
     })
     .await
 }
+
+pub async fn check_queue() -> Result<bool> {
+    let conn = Connection::open("./db/database.db").await?;
+
+    let res = conn.call(|conn| {
+        let has_items = match conn.query_row("SELECT COUNT(*) FROM lemmas", [], |row| row.get::<usize, usize>(0)) {
+            Ok(count) if count > 0 => true,
+            _ => false,
+        };
+
+        Ok(has_items)
+    }).await?;
+
+    Ok(res)
+}

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
 use tokio::fs;
 use tokio_rusqlite::Connection;
@@ -70,4 +70,37 @@ pub async fn create_frequency(frequency_path: PathBuf) -> Result<()> {
     frequency::create_table(frequency_path).await?;
 
     Ok(())
+}
+
+pub async fn check_tables() -> Result<HashMap<String, bool>> {
+    let conn = Connection::open("./db/database.db").await?;
+
+    let map = conn.call(|conn| {
+        let mut map: HashMap<String, bool> = [
+            (String::from("dictionary"), false),
+            (String::from("frequency"), false),
+            (String::from("cards"), false),
+            (String::from("lemmas"), false),
+        ].into_iter().collect();
+
+        let mut dictionary_tables = HashSet::from([
+            "words", "senses", "examples", "forms", "examples", "pronunciation", "synonyms", "sense_synonyms", "form_tags", "pronunciation_tags", "sense_tags",
+        ]);
+
+        let mut stmt = conn.prepare("SELECT name FROM sqlite_schema WHERE type = 'table'")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        for table in rows {
+            let table: String = table?;
+            dictionary_tables.remove(table.as_str());
+            map.entry(table).and_modify(|e| *e = true);
+        }
+
+        if dictionary_tables.is_empty() {
+            map.entry(String::from("dictionary")).and_modify(|e| *e = true);
+        }
+
+        Ok(map)
+    }).await?;
+
+    Ok(map)
 }

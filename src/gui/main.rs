@@ -15,10 +15,10 @@ use super::Tab;
 pub struct MainTab {
     wiktionary_path: Option<PathBuf>,
     frequency_path: Option<PathBuf>,
-    dictionary: bool,
-    schedule: bool,
-    frequency: bool,
-    queue: bool,
+    pub dictionary: bool,
+    pub schedule: bool,
+    pub frequency: bool,
+    pub queue: bool,
     keep_blacklist: bool,
 }
 
